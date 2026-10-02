@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="system" data-accent="blue">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>PocketPe — Every Rupee Has a Purpose</title>
+  <meta name="description" content="Intent-based personal money management prototype. Convert mental money separation into visual purpose-based virtual wallets." />
+  <meta name="theme-color" content="#090d16" />
+
+  <!-- Google Font: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="./css/design-tokens.css" />
+  <link rel="stylesheet" href="./css/base.css" />
+  <link rel="stylesheet" href="./css/phone-frame.css" />
+  <link rel="stylesheet" href="./css/components.css" />
+  <link rel="stylesheet" href="./css/views.css" />
+</head>
+<body>
+  <div class="desktop-stage">
+    <!-- Desktop Presentation Bar -->
+    <header class="desktop-header">
+      <div class="brand-section">
+        <div class="brand-logo-mark">₹</div>
+        <div class="brand-info">
+          <h1>
+            PocketPe
+            <span class="prototype-tag">MVP Prototype</span>
+          </h1>
+          <p>«Every rupee has a purpose» • Virtual Intent-Based Money Management</p>
+        </div>
+      </div>
+
+      <div class="desktop-controls">
+        <button class="desktop-btn" id="btn-toggle-device-frame" title="Toggle Phone Chassis vs Expanded Desktop View">
+          <span>🖥️</span> <span>Expand View</span>
+        </button>
+
+        <button class="desktop-btn" id="btn-desktop-theme-toggle" title="Toggle Light/Dark Theme">
+          <span>🌙</span>
+        </button>
+
+        <!-- Quick Accent Color Dots -->
+        <div class="desktop-accents" title="Change Theme Accent">
+          <span class="accent-dot active" data-color="blue" title="Indigo Blue"></span>
+          <span class="accent-dot" data-color="green" title="Emerald Green"></span>
+          <span class="accent-dot" data-color="purple" title="Violet Purple"></span>
+          <span class="accent-dot" data-color="orange" title="Sunset Orange"></span>
+          <span class="accent-dot" data-color="teal" title="Cyan Teal"></span>
+        </div>
+
+        <button class="desktop-btn" id="btn-desktop-tour" title="Take App Tour">
+          <span>✨</span> <span>Tour</span>
+        </button>
+
+        <button class="desktop-btn" id="btn-desktop-reset" title="Reset to Initial Demo State">
+          <span>🔄</span> <span>Reset Data</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Mobile Device Simulator Chassis -->
+    <main class="phone-wrapper">
+      <div class="phone-frame">
+        <!-- Dynamic Island / Top Notch -->
+        <div class="dynamic-island" aria-hidden="true">
+          <div class="island-camera"></div>
+          <div class="island-sensor"></div>
+        </div>
+
+        <!-- Simulated Mobile Status Bar -->
+        <div class="phone-status-bar" aria-label="Status Bar">
+          <span class="status-time" id="status-bar-clock">9:41</span>
+          <div class="status-icons">
+            <span title="Full 5G Signal">●●●●</span>
+            <span title="Wi-Fi Connected">📶</span>
+            <div class="status-battery" title="Battery 82%">
+              <div class="battery-pill">
+                <div class="battery-level"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phone Scrollable Screen Content -->
+        <div class="phone-screen" id="phone-screen-container">
+          <!-- Floating Toast Container -->
+          <div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+          <!-- 1. HOME TAB VIEW -->
+          <section class="view-screen active" id="view-home" aria-label="Home"></section>
+
+          <!-- 2. WALLETS TAB VIEW -->
+          <section class="view-screen" id="view-wallets" aria-label="Wallets"></section>
+
+          <!-- 3. PAY TAB VIEW -->
+          <section class="view-screen" id="view-pay" aria-label="Scan & Pay"></section>
+
+          <!-- 4. ACTIVITY TAB VIEW -->
+          <section class="view-screen" id="view-activity" aria-label="Activity"></section>
+
+          <!-- 5. PROFILE & SETTINGS TAB VIEW -->
+          <section class="view-screen" id="view-profile" aria-label="Profile and Settings"></section>
+
+          <!-- =============================================================
+               MODALS & BOTTOM SHEETS
+               ============================================================= -->
+
+          <!-- Smart Payment Confirmation Sheet -->
+          <div class="modal-overlay" id="modal-confirm-payment" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Confirm Payment">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Payment Recommendation</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-confirm-payment" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Payment Protection Sheet (Deficit Shield) -->
+          <div class="modal-overlay" id="modal-payment-protection" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Payment Protection Shield">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Protection Shield</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-payment-protection" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- 3-Step Create Wallet Flow Modal -->
+          <div class="modal-overlay" id="modal-create-wallet" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Create New Purpose Wallet">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Create Wallet</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-create-wallet" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Wallet Detail Sheet -->
+          <div class="modal-overlay" id="modal-wallet-detail" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Wallet Details">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Wallet Overview</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-wallet-detail" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer">
+                <button class="btn btn-secondary" data-close-modal="modal-wallet-detail">Close</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Money Split Configuration Modal -->
+          <div class="modal-overlay" id="modal-split-rules" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Configure Automatic Money Split">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Automatic Split Rules</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-split-rules" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Receive Money Cascade Modal -->
+          <div class="modal-overlay" id="modal-receive-money" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Receive Simulated Funds">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Simulate Incoming Money</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-receive-money" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Rebalance / Move Money Modal -->
+          <div class="modal-overlay" id="modal-move-money" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Move Money Between Wallets">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Rebalance Wallets</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-move-money" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Transaction Receipt Modal -->
+          <div class="modal-overlay" id="modal-transaction-receipt" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Transaction Receipt">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Payment Receipt</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-transaction-receipt" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Custom Merchant / UPI ID Modal -->
+          <div class="modal-overlay" id="modal-custom-merchant" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Enter Custom Merchant or UPI">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Custom Pay</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-custom-merchant" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Onboarding Tour Modal -->
+          <div class="modal-overlay" id="modal-onboarding" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="PocketPe Tour">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5-Section Bottom Navigation Bar -->
+        <nav class="bottom-nav" aria-label="Primary Navigation">
+          <a href="#home" class="nav-item active" data-nav-target="home" aria-label="Home tab">
+            <div class="nav-icon">🏠</div>
+            <span>Home</span>
+          </a>
+          <a href="#wallets" class="nav-item" data-nav-target="wallets" aria-label="Wallets tab">
+            <div class="nav-icon">💼</div>
+            <span>Wallets</span>
+          </a>
+          <a href="#pay" class="nav-item nav-pay" data-nav-target="pay" aria-label="Scan and Pay">
+            <div class="pay-bubble">⚡</div>
+            <span>Pay</span>
+          </a>
+          <a href="#activity" class="nav-item" data-nav-target="activity" aria-label="Activity history tab">
+            <div class="nav-icon">📋</div>
+            <span>Activity</span>
+          </a>
+          <a href="#profile" class="nav-item" data-nav-target="profile" aria-label="Profile and Settings tab">
+            <div class="nav-icon">⚙️</div>
+            <span>Settings</span>
+          </a>
+        </nav>
+
+        <!-- Simulated Mobile Home Indicator -->
+        <div class="phone-home-indicator" aria-hidden="true"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Main JavaScript Bootstrap -->
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

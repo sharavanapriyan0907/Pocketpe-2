@@ -1,0 +1,13 @@
+# System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+
+# Local cache / logs
+*.log
+__pycache__/
+*.pyc
