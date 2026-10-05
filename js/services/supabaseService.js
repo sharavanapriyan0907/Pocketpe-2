@@ -392,6 +392,123 @@ class SupabaseService {
       console.warn('Could not sync transaction to Supabase:', e.message);
     }
   }
+
+  /**
+   * STEP 5: Fetch saved user merchant preference for a specific UPI ID
+   * Looks up merchant_preferences table using authenticated user_id + upi_id
+   */
+  async getMerchantPreference(userId, upiId) {
+    if (!userId || !upiId) return null;
+    const cleanUpi = upiId.trim().toLowerCase();
+
+    // 1. Try cloud Supabase lookup
+    if (this.isConfigured() && this.client) {
+      try {
+        const { data, error } = await this.client
+          .from('merchant_preferences')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('upi_id', cleanUpi)
+          .maybeSingle();
+
+        if (!error && data) {
+          this.setLocalPreference(userId, cleanUpi, data);
+          return {
+            userId: data.user_id,
+            upiId: data.upi_id,
+            merchantName: data.merchant_name,
+            detectedMcc: data.detected_mcc,
+            category: data.category,
+            walletId: data.wallet_id,
+            source: data.source,
+          };
+        }
+      } catch (err) {
+        console.warn('Supabase merchant_preferences query notice:', err);
+      }
+    }
+
+    // 2. Local fallback cache (for offline / instant response)
+    return this.getLocalPreference(userId, cleanUpi);
+  }
+
+  /**
+   * STEP 6 & 7: Save / update user merchant preference into Supabase merchant_preferences table
+   * Scoped strictly by authenticated user_id + upi_id
+   */
+  async saveMerchantPreference({ userId, upiId, merchantName, detectedMcc = null, category = '', walletId, source = 'user' }) {
+    if (!userId || !upiId || !walletId) return { success: false, error: 'Missing required parameters' };
+    const cleanUpi = upiId.trim().toLowerCase();
+
+    const record = {
+      user_id: userId,
+      upi_id: cleanUpi,
+      merchant_name: merchantName || '',
+      detected_mcc: detectedMcc || null,
+      category: category || '',
+      wallet_id: walletId,
+      source: source || 'user',
+      updated_at: new Date().toISOString(),
+    };
+
+    // Always update local user-scoped cache
+    this.setLocalPreference(userId, cleanUpi, record);
+
+    // Save to Supabase cloud if connected
+    if (this.isConfigured() && this.client) {
+      try {
+        const { data, error } = await this.client
+          .from('merchant_preferences')
+          .upsert([record], { onConflict: 'user_id, upi_id' });
+
+        if (error) {
+          console.warn('Supabase save merchant preference notice:', error.message);
+          return { success: true, localOnly: true, error: error.message };
+        }
+        return { success: true, data };
+      } catch (err) {
+        console.warn('Could not sync merchant preference to Supabase:', err.message);
+        return { success: true, localOnly: true, error: err.message };
+      }
+    }
+
+    return { success: true, localOnly: true };
+  }
+
+  getLocalPreference(userId, upiId) {
+    try {
+      const storageKey = `pocketpe_user_${userId}_merchant_prefs`;
+      const stored = localStorage.getItem(storageKey);
+      if (!stored) return null;
+      const parsed = JSON.parse(stored);
+      const pref = parsed[upiId.toLowerCase()];
+      if (pref) {
+        return {
+          userId: pref.user_id || userId,
+          upiId: pref.upi_id || upiId,
+          merchantName: pref.merchant_name,
+          detectedMcc: pref.detected_mcc,
+          category: pref.category,
+          walletId: pref.wallet_id,
+          source: pref.source,
+        };
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  setLocalPreference(userId, upiId, record) {
+    try {
+      const storageKey = `pocketpe_user_${userId}_merchant_prefs`;
+      const stored = localStorage.getItem(storageKey);
+      const map = stored ? JSON.parse(stored) : {};
+      map[upiId.toLowerCase()] = record;
+      localStorage.setItem(storageKey, JSON.stringify(map));
+    } catch (e) {}
+  }
 }
 
 export const supabaseService = new SupabaseService();
+

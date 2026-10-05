@@ -11,7 +11,8 @@ import { CategoryEngine } from '../engines/categoryEngine.js';
 import { WalletEngine } from '../engines/walletEngine.js';
 import { TransactionEngine } from '../engines/transactionEngine.js';
 import { FraudEngine, RISK_LEVELS } from '../engines/fraudEngine.js';
-import { UpiQrEngine } from '../engines/upiQrEngine.js';
+import { UpiQrEngine, parseUpiQr, getCategoryFromMcc, getWalletForCategory, MCC_CATEGORY_MAP } from '../engines/upiQrEngine.js';
+import { supabaseService } from '../services/supabaseService.js';
 import { FraudModal } from './fraudModal.js';
 import { NavigationManager } from './navigation.js';
 import { SoundEngine } from './sound.js';
@@ -182,7 +183,7 @@ export class PayView {
   }
 
   static bindEvents() {
-    // 1. Merchant list tap
+    // 1. Merchant list tap (simulates real UPI QR scan payload)
     const cards = this.container.querySelectorAll('.merchant-item-card');
     cards.forEach((card) => {
       card.addEventListener('click', () => {
@@ -190,14 +191,10 @@ export class PayView {
         const merchant = DEMO_MERCHANTS.find((m) => m.id === mId);
         if (merchant) {
           SoundEngine.playTap();
-          this.initiatePaymentFlow({
-            merchantName: merchant.name,
-            amount: merchant.defaultAmount,
-            category: merchant.category,
-            icon: merchant.icon,
-            upiId: merchant.upiId,
-            mcc: merchant.mcc,
-          });
+          const mccParam = merchant.mcc ? `&mc=${merchant.mcc}` : '';
+          const amParam = merchant.defaultAmount ? `&am=${merchant.defaultAmount}` : '';
+          const qrPayload = `upi://pay?pa=${merchant.upiId}&pn=${encodeURIComponent(merchant.name)}${mccParam}${amParam}&cu=INR`;
+          this.handleScannedQrPayload(qrPayload);
         }
       });
     });
@@ -491,53 +488,536 @@ export class PayView {
 
   // --- QR Payload Processing ---
 
-  static handleScannedQrPayload(rawPayload) {
+  // --- QR Payload Processing & Decision Tree ---
+
+  static async handleScannedQrPayload(rawPayload) {
     if (!rawPayload) return;
 
-    // Pause scanning
-    this.isScanning = false;
-    SoundEngine.playSuccess();
-    if (navigator.vibrate) {
-      navigator.vibrate(120);
-    }
+    // STEP 2: Decode payload using parseUpiQr
+    const upiResult = parseUpiQr(rawPayload);
 
-    const parsed = UpiQrEngine.parse(rawPayload);
-    if (!parsed || !parsed.isValid) {
-      NavigationManager.showToast('Unrecognized QR format', 'warning');
+    if (!upiResult.isUpi) {
+      NavigationManager.showToast(upiResult.error || "This QR doesn't appear to be a UPI payment QR.", 'warning');
       setTimeout(() => {
         if (this.stream) {
           this.isScanning = true;
           this.scanLoop();
         }
-      }, 2000);
+      }, 2500);
       return;
     }
 
-    // Stop camera hardware to preserve battery and privacy while confirming payment
+    // Pause scanning & stop camera to preserve battery and privacy while reviewing
     this.stopCamera();
-
-    NavigationManager.showToast(`Scanned: ${parsed.merchantName}`, 'success');
-
-    // If amount is specified in QR, proceed directly to payment recommendation sheet
-    if (parsed.amount && parsed.amount > 0) {
-      this.initiatePaymentFlow({
-        merchantName: parsed.merchantName,
-        amount: parsed.amount,
-        category: parsed.category,
-        icon: parsed.icon,
-        upiId: parsed.upiId,
-        mcc: parsed.mcc,
-      });
-    } else {
-      // If merchant counter QR without fixed amount, prompt for amount prefilled!
-      this.openCustomMerchantPrompt({
-        merchantName: parsed.merchantName,
-        upiId: parsed.upiId,
-        category: parsed.category,
-        mcc: parsed.mcc,
-        icon: parsed.icon,
-      });
+    SoundEngine.playSuccess();
+    if (navigator.vibrate) {
+      navigator.vibrate(120);
     }
+
+    const pa = upiResult.pa;
+    const pn = upiResult.pn || pa.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const mc = upiResult.mc || null;
+    const amount = upiResult.amount || null;
+
+    // STEP 10: Strict Decision Tree Execution
+    await this.processUpiPaymentDecision({
+      rawPayload,
+      pa,
+      pn,
+      mc,
+      amount,
+    });
+  }
+
+  /**
+   * STEP 10: Decision Tree:
+   * QR -> Is UPI? -> Extract pa/pn/mc -> Valid MCC?
+   * YES: MCC -> Category -> Wallet -> Suggest wallet ("Based on merchant category.")
+   * NO: Check merchant_preferences by user_id + upi_id
+   *     Previous wallet?
+   *       YES: Suggest it ("Based on your previous choice.")
+   *       NO: Ask user "Where should payments to {Name} go?", save choice, then proceed.
+   */
+  static async processUpiPaymentDecision({ rawPayload, pa, pn, mc, amount = null }) {
+    const userId = stateManager.getUserId();
+    const allWallets = stateManager.getWallets();
+
+    // STEP 3: MCC Category Detection
+    const mccCategory = getCategoryFromMcc(mc);
+
+    // DECISION BRANCH 1: Valid MCC exists!
+    if (mccCategory) {
+      // STEP 4: Category → Wallet mapping
+      const walletMatch = getWalletForCategory(mccCategory, allWallets);
+      const suggestedWallet = walletMatch.wallet;
+      const categoryIcon = MCC_CATEGORY_MAP[mc]?.icon || '🏷️';
+      const reason = 'Based on the merchant category.';
+
+      // STEP 12: Dev logging only (never sensitive authentication info)
+      console.log('🔍 [PocketPe Dev QR Scan]', {
+        'raw QR detected': rawPayload,
+        'is UPI': true,
+        pa,
+        pn,
+        mc,
+        amount: amount || 'Not specified',
+        'detected category': mccCategory,
+        'suggested wallet': suggestedWallet ? suggestedWallet.name : 'None',
+        source: 'mcc',
+      });
+
+      if (suggestedWallet) {
+        // STEP 8 & 11: Merchant QR flow with suggested wallet
+        this.showSuggestedWalletModal({
+          merchantName: pn,
+          upiId: pa,
+          mcc: mc,
+          category: mccCategory,
+          icon: categoryIcon,
+          suggestedWallet,
+          reason,
+          amount,
+          isPersonal: false,
+        });
+      } else {
+        // "No matching wallet found." -> allow manual wallet selection
+        NavigationManager.showToast('No matching wallet found.', 'info');
+        this.showWalletSelectionPrompt({
+          merchantName: pn,
+          upiId: pa,
+          mcc: mc,
+          category: mccCategory,
+          icon: categoryIcon,
+          amount,
+          promptText: `No matching wallet found for ${mccCategory}. Choose a wallet:`,
+          isPersonal: false,
+          isFirstTime: false,
+          askRemember: false,
+        });
+      }
+      return;
+    }
+
+    // DECISION BRANCH 2: mc exists but is not in our mapping (Unknown Merchant Category)
+    const isUnknownMcc = mc && mc !== '0000' && mc !== '0';
+
+    if (isUnknownMcc) {
+      // Check if user previously saved a wallet preference for this merchant
+      const existingPref = await supabaseService.getMerchantPreference(userId, pa);
+      if (existingPref && existingPref.walletId) {
+        const savedWallet = allWallets.find((w) => w.id === existingPref.walletId) || stateManager.getWallet(existingPref.walletId);
+        if (savedWallet) {
+          console.log('🔍 [PocketPe Dev QR Scan]', {
+            'raw QR detected': rawPayload,
+            'is UPI': true,
+            pa,
+            pn,
+            mc,
+            amount: amount || 'Not specified',
+            'detected category': existingPref.category || 'Merchant',
+            'suggested wallet': savedWallet.name,
+            source: 'merchant_preferences',
+          });
+
+          this.showSuggestedWalletModal({
+            merchantName: pn,
+            upiId: pa,
+            mcc: mc,
+            category: existingPref.category || 'Merchant',
+            icon: savedWallet.icon || '🏪',
+            suggestedWallet: savedWallet,
+            reason: 'Based on your previous choice.',
+            amount,
+            isPersonal: false,
+          });
+          return;
+        }
+      }
+
+      // STEP 9: Unknown Merchant Category
+      console.log('🔍 [PocketPe Dev QR Scan]', {
+        'raw QR detected': rawPayload,
+        'is UPI': true,
+        pa,
+        pn,
+        mc,
+        amount: amount || 'Not specified',
+        'detected category': 'Unknown MCC',
+        'suggested wallet': 'None',
+        source: 'unknown_mcc',
+      });
+
+      this.showWalletSelectionPrompt({
+        merchantName: pn,
+        upiId: pa,
+        mcc: mc,
+        category: 'Merchant',
+        icon: '🏪',
+        amount,
+        promptText: 'Merchant category not recognized.',
+        isPersonal: false,
+        isFirstTime: true,
+        askRemember: true,
+      });
+      return;
+    }
+
+    // DECISION BRANCH 3: Personal QR (mc missing or "0000")
+    // STEP 5: Personal QR fallback - check merchant_preferences by user_id + upi_id
+    const userPref = await supabaseService.getMerchantPreference(userId, pa);
+
+    if (userPref && userPref.walletId) {
+      // STEP 7: Returning Personal QR
+      const savedWallet = allWallets.find((w) => w.id === userPref.walletId) || stateManager.getWallet(userPref.walletId);
+      const cat = userPref.category || (savedWallet ? savedWallet.name : 'Friends & Social');
+      const icon = savedWallet?.icon || '👥';
+
+      console.log('🔍 [PocketPe Dev QR Scan]', {
+        'raw QR detected': rawPayload,
+        'is UPI': true,
+        pa,
+        pn,
+        mc: mc || 'None',
+        amount: amount || 'Not specified',
+        'detected category': cat,
+        'suggested wallet': savedWallet ? savedWallet.name : 'None',
+        source: 'merchant_preferences',
+      });
+
+      if (savedWallet) {
+        this.showSuggestedWalletModal({
+          merchantName: pn,
+          upiId: pa,
+          mcc: mc,
+          category: cat,
+          icon,
+          suggestedWallet: savedWallet,
+          reason: 'Previously selected by you',
+          amount,
+          isPersonal: true,
+        });
+        return;
+      }
+    }
+
+    // STEP 6: First-time Personal QR
+    console.log('🔍 [PocketPe Dev QR Scan]', {
+      'raw QR detected': rawPayload,
+      'is UPI': true,
+      pa,
+      pn,
+      mc: mc || 'None',
+      amount: amount || 'Not specified',
+      'detected category': 'Friends & Social',
+      'suggested wallet': 'None',
+      source: 'first_time_personal',
+    });
+
+    this.showWalletSelectionPrompt({
+      merchantName: pn,
+      upiId: pa,
+      mcc: mc,
+      category: 'Friends & Social',
+      icon: '👥',
+      amount,
+      promptText: `Where should payments to ${pn} go?`,
+      isPersonal: true,
+      isFirstTime: true,
+      askRemember: false,
+    });
+  }
+
+  /**
+   * STEP 11: Render Simple Suggested Wallet UI
+   * Matches exact mockups for Merchant QR and Personal QR
+   */
+  static showSuggestedWalletModal({
+    merchantName,
+    upiId,
+    mcc,
+    category,
+    icon = '🛍️',
+    suggestedWallet,
+    reason,
+    amount = null,
+    isPersonal = false,
+  }) {
+    const modal = document.getElementById('modal-confirm-payment');
+    if (!modal) return;
+
+    const body = modal.querySelector('.sheet-body');
+    const footer = modal.querySelector('.sheet-footer');
+    if (!body || !footer) return;
+
+    let selectedAmount = amount || (this.currentPaymentData?.amount || 0);
+
+    body.innerHTML = `
+      <!-- Payee Info Header -->
+      <div style="text-align: center; margin-bottom: 16px;">
+        <div style="font-size: 2.8rem; margin-bottom: 6px;">${icon}</div>
+        <h3 class="h3" style="color: var(--text-primary); text-transform: uppercase; font-size: 1.15rem; letter-spacing: 0.5px; margin: 0;">
+          ${merchantName}
+        </h3>
+        <p class="mono" style="color: var(--text-muted); font-size: 0.78rem; margin-top: 4px;">
+          ${upiId}
+        </p>
+
+        ${
+          category
+            ? `
+          <div style="margin-top: 8px;">
+            <span class="badge badge-accent" style="font-size: 0.78rem; padding: 4px 12px; border-radius: var(--radius-full);">
+              ${icon} ${category}
+            </span>
+          </div>
+        `
+            : ''
+        }
+      </div>
+
+      <!-- Suggested Wallet Card (Step 11 Mockup) -->
+      <div class="card" style="
+        padding: 14px 16px;
+        background: var(--bg-surface-secondary);
+        border: 1.5px solid var(--accent-primary);
+        border-radius: var(--radius-lg);
+        margin-bottom: 16px;
+        text-align: left;
+      ">
+        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">
+          Suggested wallet
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 1.6rem;">${suggestedWallet.icon}</span>
+            <div>
+              <div style="font-weight: 700; font-size: var(--text-sm); color: var(--text-primary);">
+                ${suggestedWallet.name} ${!suggestedWallet.name.toLowerCase().includes('wallet') ? 'Wallet' : ''}
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">
+                Balance: ${WalletEngine.formatRupee(suggestedWallet.balance)}
+              </div>
+            </div>
+          </div>
+          <span class="badge" style="font-size: 0.65rem; background: rgba(59, 130, 246, 0.15); color: var(--accent-primary);">
+            Suggested
+          </span>
+        </div>
+        <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 10px; border-top: 1px dashed var(--border-subtle); padding-top: 8px;">
+          ${reason}
+        </div>
+      </div>
+
+      <!-- Amount Section -->
+      <div class="card" style="padding: 12px 14px; text-align: center; margin-bottom: 14px; background: var(--bg-subtle);">
+        <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">
+          Amount to Pay
+        </div>
+        ${
+          selectedAmount > 0
+            ? `
+          <div class="payment-amount-display" style="font-size: 2rem; font-weight: 800; color: var(--text-primary); margin-top: 4px;">
+            ${WalletEngine.formatRupee(selectedAmount)}
+          </div>
+        `
+            : `
+          <div style="display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 6px;">
+            <span style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">₹</span>
+            <input
+              type="number"
+              id="input-suggest-amount"
+              class="input-text"
+              placeholder="Enter amount"
+              style="font-size: 1.4rem; font-weight: 800; text-align: center; width: 140px; padding: 4px;"
+              min="1"
+            />
+          </div>
+        `
+        }
+      </div>
+    `;
+
+    footer.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+        <button class="btn btn-primary" id="btn-suggest-continue" style="width: 100%; padding: 12px;">
+          ${isPersonal ? `Use ${suggestedWallet.name}` : 'Continue'}
+        </button>
+        <button class="btn btn-secondary btn-sm" id="btn-suggest-choose-another" style="width: 100%;">
+          ${isPersonal ? 'Choose another' : 'Choose another wallet'}
+        </button>
+      </div>
+    `;
+
+    // Action 1: Continue / Use Wallet -> Proceed to payment review
+    footer.querySelector('#btn-suggest-continue')?.addEventListener('click', () => {
+      let finalAmt = selectedAmount;
+      const amtInput = body.querySelector('#input-suggest-amount');
+      if (amtInput) {
+        finalAmt = parseFloat(amtInput.value) || 0;
+        if (finalAmt <= 0) {
+          NavigationManager.showToast('Please enter an amount to proceed', 'warning');
+          return;
+        }
+      }
+
+      SoundEngine.playTap();
+      this.initiatePaymentFlow({
+        merchantName,
+        amount: finalAmt,
+        category,
+        icon,
+        upiId,
+        mcc,
+        preferredWalletId: suggestedWallet.id,
+        reason,
+      });
+    });
+
+    // Action 2: Choose Another -> Open wallet selector
+    footer.querySelector('#btn-suggest-choose-another')?.addEventListener('click', () => {
+      SoundEngine.playTap();
+      this.showWalletSelectionPrompt({
+        merchantName,
+        upiId,
+        mcc,
+        category,
+        icon,
+        amount: selectedAmount,
+        promptText: `Select wallet for ${merchantName}:`,
+        isPersonal,
+        isFirstTime: false,
+        askRemember: true,
+      });
+    });
+
+    NavigationManager.openModal('modal-confirm-payment');
+  }
+
+  /**
+   * STEP 6 & 9: Wallet Selection UI (First-time Personal QR or Manual Override)
+   */
+  static showWalletSelectionPrompt({
+    merchantName,
+    upiId,
+    mcc = null,
+    category = 'General',
+    icon = '👤',
+    amount = null,
+    promptText,
+    isPersonal = false,
+    isFirstTime = false,
+    askRemember = false,
+  }) {
+    const modal = document.getElementById('modal-confirm-payment');
+    if (!modal) return;
+
+    const body = modal.querySelector('.sheet-body');
+    const footer = modal.querySelector('.sheet-footer');
+    if (!body || !footer) return;
+
+    const allWallets = stateManager.getWallets();
+    const userId = stateManager.getUserId();
+
+    body.innerHTML = `
+      <div style="text-align: center; margin-bottom: 16px;">
+        <div style="font-size: 2.4rem; margin-bottom: 4px;">${icon}</div>
+        <h3 class="h3" style="color: var(--text-primary); font-size: 1.15rem; margin: 0;">
+          ${promptText}
+        </h3>
+        <p class="mono" style="color: var(--text-muted); font-size: 0.75rem; margin-top: 4px;">
+          ${upiId}
+        </p>
+      </div>
+
+      <div class="wallet-select-grid" id="wallet-prompt-options" style="display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto;">
+        ${allWallets
+          .map(
+            (w) => `
+          <div class="wallet-option-item" data-prompt-wallet-id="${w.id}" style="
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 14px; border-radius: var(--radius-md);
+            border: 1px solid var(--border-subtle);
+            background: var(--bg-subtle);
+            cursor: pointer; transition: all var(--transition-fast);
+          ">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 1.3rem;">${w.icon}</span>
+              <div>
+                <div style="font-weight: 600; font-size: var(--text-sm); color: var(--text-primary);">${w.name}</div>
+                <div style="font-size: 0.7rem; color: var(--text-muted);">${w.category || 'General'}</div>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-weight: 700; font-size: var(--text-sm); color: var(--text-primary);">
+                ${WalletEngine.formatRupee(w.balance)}
+              </div>
+            </div>
+          </div>
+        `
+          )
+          .join('')}
+      </div>
+
+      ${
+        askRemember
+          ? `
+        <div class="card" id="remember-choice-box" style="margin-top: 14px; padding: 10px 12px; background: var(--bg-surface-secondary); display: flex; align-items: center; justify-content: space-between;">
+          <label style="font-size: var(--text-xs); color: var(--text-primary); font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="chk-remember-choice" checked />
+            <span>Remember this choice for future payments</span>
+          </label>
+        </div>
+      `
+          : ''
+      }
+    `;
+
+    footer.innerHTML = `
+      <button class="btn btn-ghost btn-sm" data-close-modal="modal-confirm-payment" style="width: 100%;">
+        Cancel
+      </button>
+    `;
+
+    // Wallet selection click
+    body.querySelectorAll('[data-prompt-wallet-id]').forEach((card) => {
+      card.addEventListener('click', async () => {
+        const chosenId = card.getAttribute('data-prompt-wallet-id');
+        const chosenWallet = stateManager.getWallet(chosenId);
+        if (!chosenWallet) return;
+
+        SoundEngine.playTap();
+
+        const shouldRemember = isFirstTime || body.querySelector('#chk-remember-choice')?.checked;
+
+        if (shouldRemember) {
+          // STEP 6 & 7: Save to Supabase merchant_preferences (user_id + upi_id)
+          await supabaseService.saveMerchantPreference({
+            userId,
+            upiId,
+            merchantName,
+            detectedMcc: mcc || null,
+            category: chosenWallet.category || chosenWallet.name,
+            walletId: chosenWallet.id,
+            source: 'user',
+          });
+          NavigationManager.showToast(`Saved ${chosenWallet.name} as preference for ${merchantName}`, 'success');
+        }
+
+        // Proceed to payment confirmation sheet
+        this.initiatePaymentFlow({
+          merchantName,
+          amount,
+          category: chosenWallet.category || category,
+          icon: chosenWallet.icon || icon,
+          upiId,
+          mcc,
+          preferredWalletId: chosenWallet.id,
+          reason: shouldRemember ? 'Based on your previous choice.' : 'Selected for this payment.',
+        });
+      });
+    });
+
+    NavigationManager.openModal('modal-confirm-payment');
   }
 
   // --- Scan QR from Image File ---
@@ -590,9 +1070,19 @@ export class PayView {
     reader.readAsDataURL(file);
   }
 
-  // --- Payment Execution Flow with Fraud Check ---
+  // --- Payment Execution Flow with Fraud Check & User Confirmation ---
 
-  static initiatePaymentFlow({ merchantName, amount, category, icon = '🛍️', upiId = null, mcc = null, skipRiskCheck = false }) {
+  static initiatePaymentFlow({
+    merchantName,
+    amount = null,
+    category = 'General',
+    icon = '🛍️',
+    upiId = null,
+    mcc = null,
+    preferredWalletId = null,
+    reason = null,
+    skipRiskCheck = false,
+  }) {
     // 1. Resolve UPI ID
     let resolvedUpiId = upiId;
     if (!resolvedUpiId) {
@@ -614,7 +1104,7 @@ export class PayView {
       FraudModal.showHighRiskWarning({
         upiId: resolvedUpiId,
         displayName: merchantName,
-        amount,
+        amount: amount || 0,
         onProceed: () => {
           this.initiatePaymentFlow({
             merchantName,
@@ -623,6 +1113,8 @@ export class PayView {
             icon,
             upiId: resolvedUpiId,
             mcc,
+            preferredWalletId,
+            reason,
             skipRiskCheck: true,
           });
         },
@@ -636,23 +1128,28 @@ export class PayView {
     // Record interaction in fraud engine
     stateManager.recordInteraction(resolvedUpiId);
 
-    // 4. Run through categorization engine (supporting MCC code detection)
-    const classification = CategoryEngine.classifyMerchant(merchantName, amount, category, mcc);
-    const recommendedWallet = classification.recommendedWallet || stateManager.getFreeMoneyWallet();
+    // 4. Resolve wallet: if preferredWalletId passed, use that; else run category classification
+    let chosenWallet = preferredWalletId ? stateManager.getWallet(preferredWalletId) : null;
+    let finalReason = reason;
+
+    if (!chosenWallet) {
+      const classification = CategoryEngine.classifyMerchant(merchantName, amount || 0, category, mcc);
+      chosenWallet = classification.recommendedWallet || stateManager.getFreeMoneyWallet();
+      finalReason = finalReason || classification.reason;
+    }
 
     this.currentPaymentData = {
       merchantName,
       upiId: resolvedUpiId,
       risk,
-      amount: Number(amount),
-      category: classification.category,
-      icon: classification.icon || icon,
-      recommendedWallet,
-      isLearned: classification.isLearned,
-      reason: classification.reason,
+      amount: amount !== null && amount !== undefined && !isNaN(Number(amount)) && Number(amount) > 0 ? Number(amount) : null,
+      category: category || chosenWallet.category || 'General Expense',
+      icon: icon || chosenWallet.icon || '🛍️',
+      recommendedWallet: chosenWallet,
+      reason: finalReason || `Selected ${chosenWallet.name}.`,
       mcc,
     };
-    this.selectedWalletId = recommendedWallet.id;
+    this.selectedWalletId = chosenWallet.id;
     this.pendingCategoryChange = null;
 
     this.renderPaymentConfirmationSheet();
@@ -671,15 +1168,16 @@ export class PayView {
     const selectedWallet = stateManager.getWallet(this.selectedWalletId) || p.recommendedWallet;
     const allWallets = stateManager.getWallets();
 
-    const isSufficient = selectedWallet.balance >= p.amount;
-    const remainingAfterPayment = selectedWallet.balance - p.amount;
+    const currentAmount = p.amount || 0;
+    const isSufficient = selectedWallet.balance >= currentAmount;
+    const remainingAfterPayment = selectedWallet.balance - currentAmount;
     const risk = FraudEngine.evaluateUpiRisk(p.upiId);
 
     body.innerHTML = `
-      <!-- Merchant Avatar & Info -->
+      <!-- Payee Info Header -->
       <div style="text-align: center; margin-bottom: 20px;">
         <div style="font-size: 3rem; margin-bottom: 8px;">${p.icon}</div>
-        <h3 class="h3" style="color: var(--text-primary);">${p.merchantName}</h3>
+        <h3 class="h3" style="color: var(--text-primary); text-transform: uppercase;">${p.merchantName}</h3>
         <p class="subtitle" style="display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px;">
           <span class="mono">${p.upiId}</span>
           ${FraudModal.renderRiskBadgeHtml(p.upiId, true)}
@@ -706,8 +1204,25 @@ export class PayView {
             : ''
         }
 
+        <!-- Amount Display / Input -->
         <div class="payment-amount-display" style="font-size: 2.2rem; font-weight: 800; color: var(--text-primary); margin-top: 14px;">
-          ${WalletEngine.formatRupee(p.amount)}
+          ${
+            currentAmount > 0
+              ? WalletEngine.formatRupee(currentAmount)
+              : `
+            <div style="display: flex; align-items: center; justify-content: center; gap: 6px;">
+              <span style="font-size: 1.8rem; color: var(--text-secondary);">₹</span>
+              <input
+                type="number"
+                id="input-confirm-amount"
+                class="input-text"
+                placeholder="0"
+                style="font-size: 2rem; font-weight: 800; width: 150px; text-align: center;"
+                min="1"
+              />
+            </div>
+          `
+          }
         </div>
       </div>
 
@@ -715,11 +1230,10 @@ export class PayView {
       <div class="card" style="padding: 10px 14px; background: var(--bg-surface-secondary); margin-bottom: 16px; border-left: 3px solid var(--accent-primary);">
         <div style="font-size: var(--text-xs); color: var(--accent-primary); font-weight: 700; display: flex; align-items: center; gap: 6px;">
           <span>🎯</span> <span>SMART WALLET RECOMMENDATION</span>
-          ${p.isLearned ? '<span class="badge badge-accent" style="margin-left: auto;">Learned</span>' : ''}
           ${p.mcc ? `<span class="badge" style="margin-left: auto; font-size: 0.65rem;">MCC #${p.mcc}</span>` : ''}
         </div>
         <p style="font-size: var(--text-xs); color: var(--text-secondary); margin-top: 4px; line-height: 1.4;">
-          ${p.reason} PocketPe selected <strong>${p.recommendedWallet.name}</strong> (${p.category}).
+          ${p.reason} PocketPe selected <strong>${selectedWallet.name}</strong> (${p.category}).
         </p>
       </div>
 
@@ -730,11 +1244,12 @@ export class PayView {
           <span style="color: var(--text-muted); font-size: 0.75rem;">Change if needed</span>
         </label>
         <div class="wallet-select-grid" id="wallet-options-list" style="display: flex; flex-direction: column; gap: 8px;">
-          ${allWallets.map((w) => {
-            const isSelected = w.id === selectedWallet.id;
-            const willHaveEnough = w.balance >= p.amount;
+          ${allWallets
+            .map((w) => {
+              const isSelected = w.id === selectedWallet.id;
+              const willHaveEnough = w.balance >= currentAmount;
 
-            return `
+              return `
             <div class="wallet-option-item ${isSelected ? 'selected' : ''}" data-wallet-option-id="${w.id}" style="
               display: flex; align-items: center; justify-content: space-between;
               padding: 10px 14px; border-radius: var(--radius-md);
@@ -759,7 +1274,8 @@ export class PayView {
               </div>
             </div>
           `;
-          }).join('')}
+            })
+            .join('')}
         </div>
       </div>
 
@@ -783,7 +1299,7 @@ export class PayView {
           Cancel
         </button>
         <button class="btn btn-primary" id="btn-execute-payment" style="flex: 2;">
-          Pay ${WalletEngine.formatRupee(p.amount)}
+          ${currentAmount > 0 ? `Pay ${WalletEngine.formatRupee(currentAmount)}` : 'Confirm & Pay'}
         </button>
       </div>
     `;
@@ -797,8 +1313,8 @@ export class PayView {
         const chosen = stateManager.getWallet(wId);
 
         // Check if user changed away from recommended
-        if (chosen && chosen.id !== p.recommendedWallet.id) {
-          this.showLearningPrompt(p.merchantName, chosen);
+        if (chosen && chosen.id !== p.recommendedWallet?.id) {
+          this.showLearningPrompt(p.merchantName, chosen, p.upiId);
         } else {
           const lContainer = body.querySelector('#learning-prompt-container');
           if (lContainer) lContainer.innerHTML = '';
@@ -820,13 +1336,13 @@ export class PayView {
       });
     }
 
-    // Execute Payment Click
+    // Execute Payment Click (STEP 13: User Must Always Explicitly Confirm)
     footer.querySelector('#btn-execute-payment').addEventListener('click', () => {
       this.handlePaymentAttempt();
     });
   }
 
-  static showLearningPrompt(merchantName, chosenWallet) {
+  static showLearningPrompt(merchantName, chosenWallet, upiId = null) {
     const container = document.getElementById('learning-prompt-container');
     if (!container) return;
 
@@ -852,8 +1368,19 @@ export class PayView {
 
     const yesBtn = container.querySelector('#btn-learn-yes');
     if (yesBtn) {
-      yesBtn.addEventListener('click', () => {
+      yesBtn.addEventListener('click', async () => {
+        const userId = stateManager.getUserId();
         CategoryEngine.teachMerchantCategory(merchantName, chosenWallet.category || chosenWallet.name, chosenWallet.id);
+        if (upiId) {
+          await supabaseService.saveMerchantPreference({
+            userId,
+            upiId,
+            merchantName,
+            category: chosenWallet.category || chosenWallet.name,
+            walletId: chosenWallet.id,
+            source: 'user',
+          });
+        }
         SoundEngine.playTap();
         NavigationManager.showToast(`Saved! Future "${merchantName}" payments will use ${chosenWallet.name}.`, 'success');
         container.innerHTML = `<div style="font-size: var(--text-xs); color: var(--success); font-weight: 600;">✨ Learned: ${chosenWallet.name} will be recommended next time.</div>`;
@@ -872,11 +1399,25 @@ export class PayView {
 
   static handlePaymentAttempt() {
     const p = this.currentPaymentData;
-    const walletId = this.selectedWalletId;
+    const modal = document.getElementById('modal-confirm-payment');
+    const amtInput = modal ? modal.querySelector('#input-confirm-amount') : null;
+    let finalAmount = p.amount;
+
+    if (amtInput) {
+      finalAmount = parseFloat(amtInput.value) || 0;
+      p.amount = finalAmount;
+    }
+
+    if (!finalAmount || finalAmount <= 0) {
+      NavigationManager.showToast('Please enter a valid amount to pay', 'warning');
+      return;
+    }
+
+    const walletId = this.selectedWalletId || p.recommendedWallet?.id;
 
     const result = TransactionEngine.processPayment({
       merchantName: p.merchantName,
-      amount: p.amount,
+      amount: finalAmount,
       category: p.category,
       walletId,
       upiId: p.upiId,
@@ -886,7 +1427,7 @@ export class PayView {
     if (result.status === 'success') {
       SoundEngine.playSuccess();
       NavigationManager.closeModal('modal-confirm-payment');
-      NavigationManager.showToast(`✅ Payment Successful: ${WalletEngine.formatRupee(p.amount)} from ${result.wallet.name}`, 'success');
+      NavigationManager.showToast(`✅ Payment Successful: ${WalletEngine.formatRupee(finalAmount)} from ${result.wallet.name}`, 'success');
       NavigationManager.switchTab('activity');
     } else if (result.status === 'insufficient_balance') {
       // INSUFFICIENT BALANCE -> Trigger PAYMENT PROTECTION SHIELD!

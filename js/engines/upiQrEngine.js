@@ -2,60 +2,293 @@
    POCKETPE - UPI QR CODE DECODER & PARSER ENGINE
    Parses standard Indian UPI QR specification (upi://pay?pa=...&pn=...)
    Extracts payee, merchant name, amount, MCC code, currency, and note.
-   Intelligently distinguishes commercial merchants (MCC) vs P2P Friends (no MCC / mc=0000).
+   Provides centralized MCC mapping (getCategoryFromMcc) and wallet matching (getWalletForCategory).
    ========================================================================== */
 
+/**
+ * Centralized MCC Category Mapping Table
+ * Maps standardized 4-digit Merchant Category Codes to PocketPe spending categories.
+ */
 export const MCC_CATEGORY_MAP = {
-  // Food & Dining
-  '5411': { category: 'Food & Dining', icon: '🛒', label: 'Grocery Stores / Supermarkets' },
-  '5462': { category: 'Food & Dining', icon: '🥖', label: 'Bakeries' },
-  '5499': { category: 'Food & Dining', icon: '🏪', label: 'Misc Food Stores / Convenience' },
-  '5811': { category: 'Food & Dining', icon: '🍱', label: 'Caterers' },
-  '5812': { category: 'Food & Dining', icon: '🍔', label: 'Restaurants & Eating Places' },
-  '5813': { category: 'Food & Dining', icon: '🍻', label: 'Drinking Places / Lounges' },
-  '5814': { category: 'Food & Dining', icon: '🍕', label: 'Fast Food Restaurants' },
+  // Medical / Health
+  '5912': { category: 'Medical', label: 'Pharmacies & Drug Stores', icon: '💊' },
+  '8011': { category: 'Medical', label: 'Doctors & Physicians', icon: '🩺' },
+  '8021': { category: 'Medical', label: 'Dentists', icon: '🦷' },
+  '8062': { category: 'Medical', label: 'Hospitals', icon: '🏥' },
+
+  // Food & Dining / Grocery
+  '5812': { category: 'Food', label: 'Restaurants & Eating Places', icon: '🍔' },
+  '5814': { category: 'Food', label: 'Fast Food Restaurants', icon: '🍕' },
+  '5411': { category: 'Grocery', label: 'Grocery Stores / Supermarkets', icon: '🛒' },
+  '5462': { category: 'Food', label: 'Bakeries', icon: '🥖' },
+  '5499': { category: 'Grocery', label: 'Misc Food & Convenience Stores', icon: '🏪' },
+  '5811': { category: 'Food', label: 'Caterers', icon: '🍱' },
+  '5813': { category: 'Food', label: 'Drinking Places / Bars', icon: '🍻' },
 
   // Transport & Fuel
-  '4111': { category: 'Transport & Fuel', icon: '🚆', label: 'Local Commuter Transport / Metro' },
-  '4121': { category: 'Transport & Fuel', icon: '🚕', label: 'Taxicabs / Uber / Ola' },
-  '4131': { category: 'Transport & Fuel', icon: '🚌', label: 'Bus Lines' },
-  '4789': { category: 'Transport & Fuel', icon: '🚗', label: 'Transportation Services' },
-  '5541': { category: 'Transport & Fuel', icon: '⛽', label: 'Service Stations / Petrol / Fuel' },
-  '5542': { category: 'Transport & Fuel', icon: '⛽', label: 'Automated Fuel Dispensers' },
+  '4121': { category: 'Transportation', label: 'Taxi & Rideshare', icon: '🚕' },
+  '4111': { category: 'Transportation', label: 'Commuter Transport & Metro', icon: '🚆' },
+  '4131': { category: 'Transportation', label: 'Bus Lines', icon: '🚌' },
+  '4789': { category: 'Transportation', label: 'Transportation Services', icon: '🚗' },
+  '5541': { category: 'Fuel', label: 'Service Stations / Petrol', icon: '⛽' },
+  '5542': { category: 'Fuel', label: 'Automated Fuel Dispensers', icon: '⛽' },
 
-  // Education & College
-  '8211': { category: 'College & Education', icon: '🏫', label: 'Elementary & Secondary Schools' },
-  '8220': { category: 'College & Education', icon: '🎓', label: 'Colleges & Universities' },
-  '8299': { category: 'College & Education', icon: '📚', label: 'Educational Services / Courses' },
-  '5942': { category: 'College & Education', icon: '📖', label: 'Book Stores' },
-  '5943': { category: 'College & Education', icon: '✏️', label: 'Stationery Stores' },
-
-  // Health & Wellness
-  '5912': { category: 'Health & Wellness', icon: '💊', label: 'Pharmacies & Drug Stores' },
-  '8011': { category: 'Health & Wellness', icon: '🩺', label: 'Doctors & Physicians' },
-  '8021': { category: 'Health & Wellness', icon: '🦷', label: 'Dentists' },
-  '8062': { category: 'Health & Wellness', icon: '🏥', label: 'Hospitals' },
-
-  // Shopping & Apparel
-  '5311': { category: 'Shopping & Apparel', icon: '🏬', label: 'Department Stores' },
-  '5651': { category: 'Shopping & Apparel', icon: '👕', label: 'Family Clothing Stores' },
-  '5661': { category: 'Shopping & Apparel', icon: '👟', label: 'Shoe Stores' },
-  '5944': { category: 'Shopping & Apparel', icon: '💍', label: 'Jewelry Stores' },
+  // Education
+  '8220': { category: 'Education', label: 'Colleges & Universities', icon: '🎓' },
+  '8211': { category: 'Education', label: 'Elementary & Secondary Schools', icon: '🏫' },
+  '8299': { category: 'Education', label: 'Educational Services & Courses', icon: '📚' },
+  '5942': { category: 'Education', label: 'Book Stores', icon: '📖' },
+  '5943': { category: 'Education', label: 'Stationery Stores', icon: '✏️' },
 
   // Personal Care
-  '7230': { category: 'Personal Care', icon: '💈', label: 'Beauty & Barber Shops' },
-  '7298': { category: 'Personal Care', icon: '🧖', label: 'Health & Beauty Spas' },
+  '7230': { category: 'Personal Care', label: 'Salon & Barber', icon: '💈' },
+  '7298': { category: 'Personal Care', label: 'Health & Beauty Spas', icon: '🧖' },
+
+  // Utilities & Housing
+  '4900': { category: 'Utilities', label: 'Utilities (Electric, Gas, Water)', icon: '💡' },
+  '4899': { category: 'Utilities', label: 'Cable & Internet Services', icon: '📡' },
+
+  // Shopping & Apparel
+  '5311': { category: 'Shopping', label: 'Department Stores', icon: '🏬' },
+  '5651': { category: 'Shopping', label: 'Family Clothing Stores', icon: '👕' },
+  '5661': { category: 'Shopping', label: 'Shoe Stores', icon: '👟' },
+  '5944': { category: 'Shopping', label: 'Jewelry Stores', icon: '💍' },
 
   // Entertainment
-  '7832': { category: 'Entertainment', icon: '🎬', label: 'Motion Picture Theaters / Cinema' },
-  '7999': { category: 'Entertainment', icon: '🎮', label: 'Recreation & Gaming Services' },
-
-  // Housing & Utilities
-  '4900': { category: 'Housing', icon: '💡', label: 'Utilities (Electric, Gas, Water)' },
-  '4899': { category: 'Housing', icon: '📡', label: 'Cable & Internet Services' },
+  '7832': { category: 'Entertainment', label: 'Motion Picture Theaters / Cinema', icon: '🎬' },
+  '7999': { category: 'Entertainment', label: 'Recreation & Gaming Services', icon: '🎮' },
 };
 
+/**
+ * STEP 2: Reusable UPI QR parser function
+ * Safely decodes upi://pay?... payloads into parameter map.
+ * Extracts: pa, pn, mc, am, cu, tn, tr, mid, msid, mtid.
+ * Only stores fields that actually exist.
+ * Returns { isUpi: false, error: "This QR doesn't appear to be a UPI payment QR." } on non-UPI QR.
+ *
+ * @param {string} rawQrData
+ * @returns {Object}
+ */
+export function parseUpiQr(rawQrData) {
+  if (!rawQrData || typeof rawQrData !== 'string') {
+    return {
+      isUpi: false,
+      error: "This QR doesn't appear to be a UPI payment QR.",
+    };
+  }
+
+  const trimmed = rawQrData.trim();
+  const lower = trimmed.toLowerCase();
+
+  // Check if string contains UPI intent protocol
+  if (!lower.startsWith('upi://pay')) {
+    return {
+      isUpi: false,
+      error: "This QR doesn't appear to be a UPI payment QR.",
+      raw: rawQrData,
+    };
+  }
+
+  try {
+    const qIdx = trimmed.indexOf('?');
+    if (qIdx === -1) {
+      return {
+        isUpi: false,
+        error: "This QR doesn't appear to be a UPI payment QR.",
+        raw: rawQrData,
+      };
+    }
+
+    const queryString = trimmed.substring(qIdx + 1);
+    const params = new URLSearchParams(queryString);
+
+    const getParam = (name) => {
+      const target = name.toLowerCase();
+      for (const [k, v] of params.entries()) {
+        if (k.toLowerCase() === target) {
+          return v;
+        }
+      }
+      return null;
+    };
+
+    const decodeVal = (val, replacePlus = false) => {
+      if (val === null || val === undefined) return undefined;
+      const clean = val.trim();
+      if (!clean) return undefined;
+      try {
+        const str = replacePlus ? clean.replace(/\+/g, ' ') : clean;
+        return decodeURIComponent(str).trim();
+      } catch (e) {
+        return clean;
+      }
+    };
+
+    const rawPa = getParam('pa');
+    if (!rawPa) {
+      return {
+        isUpi: false,
+        error: "This QR doesn't appear to be a UPI payment QR.",
+        raw: rawQrData,
+      };
+    }
+
+    const pa = decodeVal(rawPa, false);
+    if (!pa) {
+      return {
+        isUpi: false,
+        error: "This QR doesn't appear to be a UPI payment QR.",
+        raw: rawQrData,
+      };
+    }
+
+    const result = {
+      isUpi: true,
+      pa,
+      raw: rawQrData,
+    };
+
+    // Extract all supported fields, ONLY storing fields that actually exist!
+    const pn = decodeVal(getParam('pn'), true);
+    if (pn !== undefined) result.pn = pn;
+
+    const mc = decodeVal(getParam('mc'), false);
+    if (mc !== undefined) result.mc = mc;
+
+    const am = decodeVal(getParam('am'), false);
+    if (am !== undefined) {
+      result.am = am;
+      const numAm = parseFloat(am);
+      if (!isNaN(numAm) && numAm > 0) {
+        result.amount = numAm;
+      }
+    }
+
+    const cu = decodeVal(getParam('cu'), false);
+    if (cu !== undefined) result.cu = cu;
+
+    const tn = decodeVal(getParam('tn'), true);
+    if (tn !== undefined) result.tn = tn;
+
+    const tr = decodeVal(getParam('tr'), false);
+    if (tr !== undefined) result.tr = tr;
+
+    const mid = decodeVal(getParam('mid'), false);
+    if (mid !== undefined) result.mid = mid;
+
+    const msid = decodeVal(getParam('msid'), false);
+    if (msid !== undefined) result.msid = msid;
+
+    const mtid = decodeVal(getParam('mtid'), false);
+    if (mtid !== undefined) result.mtid = mtid;
+
+    return result;
+  } catch (err) {
+    return {
+      isUpi: false,
+      error: "This QR doesn't appear to be a UPI payment QR.",
+      raw: rawQrData,
+    };
+  }
+}
+
+/**
+ * STEP 3: Centralized MCC Category Mapping Function
+ * Maps MCC code to high-level spending category.
+ * If MCC is missing, null, empty, "0000", or unknown: returns null.
+ * Does NOT guess category from merchant name.
+ *
+ * @param {string|number|null} mcc
+ * @returns {string|null}
+ */
+export function getCategoryFromMcc(mcc) {
+  if (!mcc) return null;
+  const cleanMcc = String(mcc).trim();
+  if (!cleanMcc || cleanMcc === '0000' || cleanMcc === '0') {
+    return null;
+  }
+
+  const match = MCC_CATEGORY_MAP[cleanMcc];
+  return match ? match.category : null;
+}
+
+/**
+ * STEP 4: MCC Category to User Wallet Resolver
+ * Maps a spending category (Medical, Food, Grocery, Transportation, Fuel, Education, etc.)
+ * to the user's actual active wallet list.
+ * Does NOT create duplicate wallets.
+ * Returns { wallet: null, matched: false, message: "No matching wallet found." } if missing.
+ *
+ * @param {string} category
+ * @param {Array} wallets
+ * @returns {{ wallet: Object|null, matched: boolean, message: string|null }}
+ */
+export function getWalletForCategory(category, wallets = []) {
+  if (!category || !Array.isArray(wallets) || wallets.length === 0) {
+    return {
+      wallet: null,
+      matched: false,
+      message: 'No matching wallet found.',
+    };
+  }
+
+  const cleanCat = category.trim().toLowerCase();
+
+  // Category keyword mappings for user wallets
+  const CATEGORY_WALLET_MATCHERS = {
+    medical: ['medical', 'health', 'care', 'pharmacy', 'medicine', 'hospital', 'doctor'],
+    food: ['food', 'dining', 'restaurant', 'eat', 'snack', 'grocery'],
+    grocery: ['grocery', 'food', 'dining', 'supermarket', 'mart'],
+    transportation: ['travel', 'transport', 'commute', 'transit', 'fuel', 'cab', 'taxi', 'ride'],
+    fuel: ['travel', 'transport', 'fuel', 'petrol', 'diesel'],
+    education: ['education', 'college', 'courses', 'course', 'study', 'books', 'tuition'],
+    utilities: ['housing', 'utilities', 'bills', 'rent', 'electric'],
+    'personal care': ['personal care', 'salon', 'barber', 'grooming', 'beauty'],
+    'friends & social': ['friends', 'friend', 'social', 'p2p', 'personal'],
+    shopping: ['shopping', 'apparel', 'clothes', 'lifestyle'],
+    entertainment: ['entertainment', 'movies', 'fun'],
+    savings: ['savings', 'growth', 'investment'],
+  };
+
+  const keywords = CATEGORY_WALLET_MATCHERS[cleanCat] || [cleanCat];
+
+  for (const kw of keywords) {
+    const found = wallets.find((w) => {
+      const wName = (w.name || '').toLowerCase();
+      const wCat = (w.category || '').toLowerCase();
+      const wId = (w.id || '').toLowerCase();
+
+      return (
+        wName.includes(kw) ||
+        wCat.includes(kw) ||
+        wId.includes(`wallet_${kw}`) ||
+        (kw === 'transportation' && (wName.includes('travel') || wCat.includes('travel') || wId.includes('transport'))) ||
+        (kw === 'education' && (wName.includes('college') || wCat.includes('college') || wId.includes('college'))) ||
+        (kw === 'medical' && (wName.includes('health') || wCat.includes('health')))
+      );
+    });
+
+    if (found) {
+      return {
+        wallet: found,
+        matched: true,
+        message: null,
+      };
+    }
+  }
+
+  return {
+    wallet: null,
+    matched: false,
+    message: 'No matching wallet found.',
+  };
+}
+
 export class UpiQrEngine {
+  static parseUpiQr = parseUpiQr;
+  static getCategoryFromMcc = getCategoryFromMcc;
+  static getWalletForCategory = getWalletForCategory;
+
   /**
    * Parse any scanned QR text or pasted UPI input into a normalized payment object
    * @param {string} rawString
@@ -71,7 +304,7 @@ export class UpiQrEngine {
       return this.parseUpiUri(trimmed);
     }
 
-    // 2. BharatPe / PhonePe / Paytm / GPay web link formats
+    // 2. Web payment link formats (BharatPe / PhonePe / Paytm / GPay)
     if (
       trimmed.includes('phonepe.com') ||
       trimmed.includes('phon.pe') ||
@@ -100,8 +333,8 @@ export class UpiQrEngine {
         merchantName: prettyName,
         amount: null,
         mcc: null,
-        category: 'Friends & Social', // Auto-detected as Friend / P2P
-        icon: '🤝',
+        category: null, // Personal: Category determined by user preferences, not guessed!
+        icon: '👤',
         note: null,
         raw: trimmed,
       };
@@ -118,87 +351,49 @@ export class UpiQrEngine {
       amount: null,
       mcc: null,
       category: isPhoneNumber ? 'Friends & Social' : null,
-      icon: isPhoneNumber ? '🤝' : '🏷️',
+      icon: isPhoneNumber ? '👤' : '🏷️',
       note: null,
       raw: trimmed,
     };
   }
 
   /**
-   * Parse standard upi://pay?pa=...&pn=... string with case-insensitivity and P2P auto-detection
+   * Parse standard upi://pay?pa=...&pn=... string with case-insensitivity
    */
   static parseUpiUri(uriString) {
-    try {
-      const queryIdx = uriString.indexOf('?');
-      if (queryIdx === -1) {
-        return null;
-      }
-
-      const queryString = uriString.substring(queryIdx + 1);
-      const params = new URLSearchParams(queryString);
-
-      // Case-insensitive query parameter extractor
-      const getParam = (name) => {
-        const lowerName = name.toLowerCase();
-        for (const [k, v] of params.entries()) {
-          if (k.toLowerCase() === lowerName) return v;
-        }
-        return null;
-      };
-
-      const rawPa = getParam('pa') || ''; // Payee UPI address (e.g. rohan@okaxis)
-      const rawPn = getParam('pn') || ''; // Payee Name (e.g. Rohan Sharma)
-      const rawAm = getParam('am'); // Amount (e.g. 150.00)
-      const rawMc = getParam('mc'); // Merchant Category Code (e.g. 5812 or 0000)
-      const rawTn = getParam('tn') || ''; // Transaction note (e.g. Bill)
-      const rawCu = getParam('cu') || 'INR'; // Currency
-
-      if (!rawPa) {
-        return null;
-      }
-
-      // Safely decode parameters (supporting %40 for @ and + for spaces)
-      const pa = decodeURIComponent(rawPa).trim();
-      const pn = rawPn ? decodeURIComponent(rawPn.replace(/\+/g, ' ')).trim() : '';
-      const decodedName = pn || pa.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-      const parsedAmount = rawAm ? parseFloat(rawAm) : null;
-      const cleanMc = rawMc ? rawMc.trim() : null;
-
-      // Intelligent P2P Friend Auto-Detection vs Merchant MCC:
-      // Personal / Friend QR codes in GPay, PhonePe, Paytm have no MCC or mc=0000.
-      const isP2p = !cleanMc || cleanMc === '0000' || cleanMc === '0';
-
-      let mappedCategory = null;
-      let mappedIcon = '🏷️';
-
-      if (!isP2p && cleanMc && MCC_CATEGORY_MAP[cleanMc]) {
-        // Commercial merchant with registered MCC
-        mappedCategory = MCC_CATEGORY_MAP[cleanMc].category;
-        mappedIcon = MCC_CATEGORY_MAP[cleanMc].icon;
-      } else if (isP2p) {
-        // Peer-to-Peer Personal / Friend QR
-        mappedCategory = 'Friends & Social';
-        mappedIcon = '🤝';
-      }
-
-      return {
-        isValid: true,
-        isUpiQr: true,
-        isP2p,
-        upiId: pa,
-        merchantName: decodedName,
-        amount: parsedAmount && !isNaN(parsedAmount) && parsedAmount > 0 ? parsedAmount : null,
-        mcc: cleanMc,
-        category: mappedCategory,
-        icon: mappedIcon,
-        currency: rawCu,
-        note: rawTn ? decodeURIComponent(rawTn.replace(/\+/g, ' ')).trim() : '',
-        raw: uriString,
-      };
-    } catch (e) {
-      console.warn('Error parsing UPI URI:', e);
+    const upiResult = parseUpiQr(uriString);
+    if (!upiResult.isUpi) {
       return null;
     }
+
+    const { pa, pn, mc, amount, cu, tn } = upiResult;
+    const cleanMc = mc || null;
+    const isP2p = !cleanMc || cleanMc === '0000' || cleanMc === '0';
+
+    const decodedName = pn || pa.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const detectedCategory = getCategoryFromMcc(cleanMc);
+
+    let icon = '🏷️';
+    if (cleanMc && MCC_CATEGORY_MAP[cleanMc]) {
+      icon = MCC_CATEGORY_MAP[cleanMc].icon;
+    } else if (isP2p) {
+      icon = '👤';
+    }
+
+    return {
+      isValid: true,
+      isUpiQr: true,
+      isP2p,
+      upiId: pa,
+      merchantName: decodedName,
+      amount: amount || null,
+      mcc: cleanMc,
+      category: detectedCategory, // Strictly null if no MCC or unknown MCC!
+      icon,
+      currency: cu || 'INR',
+      note: tn || '',
+      raw: uriString,
+    };
   }
 
   /**
@@ -216,7 +411,6 @@ export class UpiQrEngine {
         return this.parseUpiUri(`upi://pay?${url.searchParams.toString()}`);
       }
 
-      // If no query params, extract hostname as merchant
       return {
         isValid: true,
         isUpiQr: false,
@@ -225,7 +419,7 @@ export class UpiQrEngine {
         merchantName: url.hostname.replace('www.', ''),
         amount: am ? parseFloat(am) : null,
         mcc: mc || null,
-        category: null,
+        category: getCategoryFromMcc(mc),
         icon: '🔗',
         note: null,
         raw: urlString,

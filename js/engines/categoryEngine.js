@@ -4,6 +4,7 @@
 
 import { stateManager } from '../state.js';
 import { DEMO_MERCHANTS } from '../config.js';
+import { getCategoryFromMcc, getWalletForCategory } from './upiQrEngine.js';
 
 export class CategoryEngine {
   /**
@@ -87,13 +88,17 @@ export class CategoryEngine {
       };
     }
 
-    // 2. Check Explicit Category (from UPI QR code MCC, P2P friend auto-detection, or user hint)
-    if (explicitCategory) {
-      const targetWallet = this.findWalletByCategory(explicitCategory) || stateManager.getFreeMoneyWallet();
-      const isFriend = explicitCategory === 'Friends & Social' || explicitCategory.toLowerCase().includes('friend');
+    // 2. Check Explicit MCC or Category
+    const mccCat = explicitMcc ? getCategoryFromMcc(explicitMcc) : null;
+    const catToUse = mccCat || explicitCategory;
+
+    if (catToUse) {
+      const walletMatch = getWalletForCategory(catToUse, wallets);
+      const targetWallet = walletMatch.wallet || this.findWalletByCategory(catToUse) || stateManager.getFreeMoneyWallet();
+      const isFriend = catToUse === 'Friends & Social' || catToUse.toLowerCase().includes('friend');
       return {
         merchantName: cleanName,
-        category: explicitCategory,
+        category: catToUse,
         recommendedWallet: targetWallet,
         isLearned: false,
         source: explicitMcc ? 'upi_mcc_code' : (isFriend ? 'p2p_friend_detection' : 'explicit_hint'),
@@ -101,7 +106,7 @@ export class CategoryEngine {
         mcc: explicitMcc,
         reason: isFriend
           ? `Auto-detected as Personal / Friend transfer (P2P). PocketPe selected ${targetWallet.name} wallet.`
-          : (explicitMcc ? `Auto-detected from UPI MCC #${explicitMcc} (${explicitCategory}).` : `Categorized as ${explicitCategory}.`),
+          : (explicitMcc ? `Auto-detected from UPI MCC #${explicitMcc} (${catToUse}).` : `Categorized as ${catToUse}.`),
       };
     }
 
@@ -175,8 +180,11 @@ export class CategoryEngine {
    */
   static findWalletByCategory(categoryName) {
     if (!categoryName) return null;
-    const lower = categoryName.toLowerCase();
     const wallets = stateManager.getWallets();
+    const match = getWalletForCategory(categoryName, wallets);
+    if (match && match.wallet) return match.wallet;
+
+    const lower = categoryName.toLowerCase();
     return wallets.find((w) => {
       const cat = (w.category || '').toLowerCase();
       const name = (w.name || '').toLowerCase();

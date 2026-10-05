@@ -175,3 +175,37 @@ create policy "Users can update own split bills"
 create policy "Users can delete own split bills" 
   on public.split_bills for delete 
   using (auth.uid() = user_id);
+
+
+-- 6. MERCHANT PREFERENCES TABLE (User-specific UPI ID and MCC to Wallet mappings)
+create table if not exists public.merchant_preferences (
+  user_id uuid references auth.users on delete cascade not null,
+  upi_id text not null,
+  merchant_name text,
+  detected_mcc text,
+  category text,
+  wallet_id text not null,
+  source text default 'user',
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  primary key (user_id, upi_id)
+);
+
+alter table public.merchant_preferences enable row level security;
+
+create policy "Users can view own merchant preferences"
+  on public.merchant_preferences for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert own merchant preferences"
+  on public.merchant_preferences for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update own merchant preferences"
+  on public.merchant_preferences for update
+  using (auth.uid() = user_id);
+
+create policy "Users can delete own merchant preferences"
+  on public.merchant_preferences for delete
+  using (auth.uid() = user_id);
+

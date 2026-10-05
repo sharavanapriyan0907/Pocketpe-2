@@ -7,7 +7,7 @@
 
 import { FraudEngine, RISK_LEVELS } from '../engines/fraudEngine.js';
 import { SplitEngine } from '../engines/splitEngine.js';
-import { UpiQrEngine } from '../engines/upiQrEngine.js';
+import { UpiQrEngine, parseUpiQr, getCategoryFromMcc, getWalletForCategory } from '../engines/upiQrEngine.js';
 import { CategoryEngine } from '../engines/categoryEngine.js';
 import { supabaseService } from '../services/supabaseService.js';
 import { stateManager } from '../state.js';
@@ -480,63 +480,211 @@ export class UnitTests {
     })();
 
     // =========================================================================
-    // FEATURE 4: UPI QR CODE PARSING & MCC AUTO-DEDUCTION TESTS
+    // FEATURE 4: UPI QR CODE PARSING, MCC MAPPING & PERSONAL QR MEMORY TESTS
     // =========================================================================
 
-    // Test 19: Standard UPI QR URI Parsing
+    // Test 19: parseUpiQr - Full parameter extraction & only storing existing fields
     (() => {
-      const rawUri = 'upi://pay?pa=chaiwala@oksbi&pn=Chai%20Point&am=45.50&mc=5812&cu=INR&tn=Evening%20Snack';
-      const parsed = UpiQrEngine.parse(rawUri);
+      const rawUri = 'upi://pay?pa=medical@upi&pn=ABC%20Medical&mc=5912&am=250&cu=INR';
+      const parsed = parseUpiQr(rawUri);
 
       assert(
-        'UPI QR Parsing: Extracts payee VPA, merchant name, amount, and MCC code from standard upi:// URI',
+        'parseUpiQr: Extracts pa, pn, mc, amount, and cu without storing absent fields',
         parsed &&
-          parsed.isValid &&
-          parsed.isUpiQr &&
-          parsed.upiId === 'chaiwala@oksbi' &&
-          parsed.merchantName === 'Chai Point' &&
-          parsed.amount === 45.5 &&
-          parsed.mcc === '5812' &&
-          parsed.category === 'Food & Dining',
+          parsed.isUpi === true &&
+          parsed.pa === 'medical@upi' &&
+          parsed.pn === 'ABC Medical' &&
+          parsed.mc === '5912' &&
+          parsed.amount === 250 &&
+          parsed.cu === 'INR' &&
+          parsed.tn === undefined &&
+          parsed.tr === undefined &&
+          parsed.mid === undefined,
         `Parsed: ${JSON.stringify(parsed)}`
       );
     })();
 
-    // Test 20: MCC Code-based Category Resolution & Auto-Deduction Target
+    // Test 20: parseUpiQr - URL-decoding (+, %40) & extended UPI parameters
     (() => {
-      // MCC 5812 = Food & Dining
-      const foodClass = CategoryEngine.classifyMerchant('Unknown Tea Stall', 50, 'Food & Dining', '5812');
-      // MCC 5541 = Transport & Fuel
-      const fuelClass = CategoryEngine.classifyMerchant('Highway Fuel Pump', 1200, 'Transport & Fuel', '5541');
+      const complexUri = 'UPI://PAY?pa=store%40upi&pn=Super+Mart&mc=5411&am=120.75&cu=INR&tn=Monthly+Groceries&tr=TXN98765&mid=MID001&msid=MSID002&mtid=MTID003';
+      const parsed = parseUpiQr(complexUri);
 
       assert(
-        'MCC Auto-Deduction: Automatically maps Merchant Category Codes to correct purpose wallets',
-        foodClass.category === 'Food & Dining' &&
-          foodClass.recommendedWallet &&
-          (foodClass.recommendedWallet.id === 'wallet_food' || foodClass.recommendedWallet.category === 'Food & Dining') &&
-          fuelClass.category === 'Transport & Fuel' &&
-          fuelClass.recommendedWallet &&
-          (fuelClass.recommendedWallet.id === 'wallet_transport' || fuelClass.recommendedWallet.category === 'Transport & Fuel'),
-        `Food wallet: ${foodClass.recommendedWallet?.id}, Fuel wallet: ${fuelClass.recommendedWallet?.id}`
+        'parseUpiQr: Handles URL-decoding (+, %40) and captures tn, tr, mid, msid, mtid',
+        parsed &&
+          parsed.isUpi === true &&
+          parsed.pa === 'store@upi' &&
+          parsed.pn === 'Super Mart' &&
+          parsed.mc === '5411' &&
+          parsed.amount === 120.75 &&
+          parsed.tn === 'Monthly Groceries' &&
+          parsed.tr === 'TXN98765' &&
+          parsed.mid === 'MID001' &&
+          parsed.msid === 'MSID002' &&
+          parsed.mtid === 'MTID003',
+        `Parsed: ${JSON.stringify(parsed)}`
       );
     })();
 
-    // Test 21: Friend / P2P QR Code Auto-Detection (no MCC or mc=0000)
+    // Test 21: parseUpiQr - Non-UPI QR and malformed QR safety
     (() => {
-      const friendUri = 'UPI://PAY?PA=sneha.sharma%40okhdfcbank&PN=Sneha+Sharma&mc=0000';
-      const parsedFriend = UpiQrEngine.parse(friendUri);
-      const classified = CategoryEngine.classifyMerchant(parsedFriend.merchantName, 300, parsedFriend.category, parsedFriend.mcc);
+      const nonUpi1 = parseUpiQr('https://example.com/pay');
+      const nonUpi2 = parseUpiQr('WIFI:S:MyNetwork;T:WPA;P:secret123;;');
+      const nonUpi3 = parseUpiQr('upi://pay?'); // missing pa
+      const nonUpi4 = parseUpiQr('');
+      const nonUpi5 = parseUpiQr(null);
 
       assert(
-        'Friend QR Auto-Detection: Automatically detects personal P2P QR codes as Friends & Social and selects Friends wallet',
-        parsedFriend &&
-          parsedFriend.isP2p &&
-          parsedFriend.upiId === 'sneha.sharma@okhdfcbank' &&
-          parsedFriend.merchantName === 'Sneha Sharma' &&
-          parsedFriend.category === 'Friends & Social' &&
-          classified.recommendedWallet &&
-          (classified.recommendedWallet.id === 'wallet_friends' || classified.recommendedWallet.category === 'Friends & Social'),
-        `Parsed: ${parsedFriend?.merchantName} -> Wallet: ${classified.recommendedWallet?.id}`
+        'parseUpiQr: Rejects non-UPI & malformed QR codes with error message without crashing',
+        nonUpi1.isUpi === false &&
+          nonUpi1.error === "This QR doesn't appear to be a UPI payment QR." &&
+          nonUpi2.isUpi === false &&
+          nonUpi2.error === "This QR doesn't appear to be a UPI payment QR." &&
+          nonUpi3.isUpi === false &&
+          nonUpi4.isUpi === false &&
+          nonUpi5.isUpi === false,
+        `Handled 5 non-UPI / malformed payloads gracefully`
+      );
+    })();
+
+    // Test 22: getCategoryFromMcc - Centralized Category Mapping
+    (() => {
+      const m5912 = getCategoryFromMcc('5912'); // Medical
+      const m5812 = getCategoryFromMcc('5812'); // Food
+      const m5814 = getCategoryFromMcc('5814'); // Food
+      const m5411 = getCategoryFromMcc('5411'); // Grocery
+      const m7230 = getCategoryFromMcc('7230'); // Personal Care
+      const m4121 = getCategoryFromMcc('4121'); // Transportation
+      const m5541 = getCategoryFromMcc('5541'); // Fuel
+      const m4900 = getCategoryFromMcc('4900'); // Utilities
+      const m8220 = getCategoryFromMcc('8220'); // Education
+
+      assert(
+        'getCategoryFromMcc: Centralized mapping maps MCC codes to standard categories',
+        m5912 === 'Medical' &&
+          m5812 === 'Food' &&
+          m5814 === 'Food' &&
+          m5411 === 'Grocery' &&
+          m7230 === 'Personal Care' &&
+          m4121 === 'Transportation' &&
+          m5541 === 'Fuel' &&
+          m4900 === 'Utilities' &&
+          m8220 === 'Education',
+        `Mappings: 5912->${m5912}, 5812->${m5812}, 5541->${m5541}, 8220->${m8220}`
+      );
+    })();
+
+    // Test 23: getCategoryFromMcc - Missing, "0000", null, and unknown MCC returns null
+    (() => {
+      const nullRes = getCategoryFromMcc(null);
+      const emptyRes = getCategoryFromMcc('');
+      const zeroRes = getCategoryFromMcc('0000');
+      const singleZeroRes = getCategoryFromMcc('0');
+      const unknownRes = getCategoryFromMcc('9999');
+
+      assert(
+        'getCategoryFromMcc: Returns null strictly for missing, "0000", null, or unknown MCC',
+        nullRes === null &&
+          emptyRes === null &&
+          zeroRes === null &&
+          singleZeroRes === null &&
+          unknownRes === null,
+        `Results: null->${nullRes}, 0000->${zeroRes}, 9999->${unknownRes}`
+      );
+    })();
+
+    // Test 24: getWalletForCategory - Category to User Wallet mapping & fallback
+    (() => {
+      const mockWallets = [
+        { id: 'wallet_food', name: 'Food', category: 'Food & Dining' },
+        { id: 'wallet_transport', name: 'Transport', category: 'Transport & Fuel' },
+        { id: 'wallet_college', name: 'College', category: 'College & Education' },
+        { id: 'wallet_friends', name: 'Friends', category: 'Friends & Social' },
+        { id: 'wallet_free', name: 'Free Money', category: 'Unallocated Cushion' },
+      ];
+
+      const foodMatch = getWalletForCategory('Food', mockWallets);
+      const groceryMatch = getWalletForCategory('Grocery', mockWallets);
+      const transportMatch = getWalletForCategory('Transportation', mockWallets);
+      const fuelMatch = getWalletForCategory('Fuel', mockWallets);
+      const eduMatch = getWalletForCategory('Education', mockWallets);
+      const medNoMatch = getWalletForCategory('Medical', mockWallets);
+
+      // When user adds a Medical wallet
+      const walletsWithMed = [...mockWallets, { id: 'wallet_med', name: 'Medical Wallet', category: 'Medical' }];
+      const medMatch = getWalletForCategory('Medical', walletsWithMed);
+
+      assert(
+        'getWalletForCategory: Correctly matches user purpose wallets and returns "No matching wallet found." if missing',
+        foodMatch.wallet?.id === 'wallet_food' &&
+          groceryMatch.wallet?.id === 'wallet_food' &&
+          transportMatch.wallet?.id === 'wallet_transport' &&
+          fuelMatch.wallet?.id === 'wallet_transport' &&
+          eduMatch.wallet?.id === 'wallet_college' &&
+          medNoMatch.matched === false &&
+          medNoMatch.message === 'No matching wallet found.' &&
+          medMatch.matched === true &&
+          medMatch.wallet?.id === 'wallet_med',
+        `medNoMatch message: "${medNoMatch.message}", medMatch: ${medMatch.wallet?.id}`
+      );
+    })();
+
+    // Test 25: Personal QR First-Time Save & Query
+    (() => {
+      const testUserId = 'usr_alice_test_101';
+      const upiId = 'ravi@upi';
+
+      const saveResult = supabaseService.saveMerchantPreference({
+        userId: testUserId,
+        upiId,
+        merchantName: 'Ravi',
+        detectedMcc: null,
+        category: 'Friends & Social',
+        walletId: 'wallet_friends',
+        source: 'user',
+      });
+
+      const retrieved = supabaseService.getLocalPreference(testUserId, upiId);
+
+      assert(
+        'Personal QR First-Time Save: Saves user_id + upi_id preference to merchant_preferences',
+        saveResult.success === true &&
+          retrieved !== null &&
+          retrieved.upiId === 'ravi@upi' &&
+          retrieved.merchantName === 'Ravi' &&
+          retrieved.walletId === 'wallet_friends' &&
+          retrieved.source === 'user',
+        `Retrieved: ${JSON.stringify(retrieved)}`
+      );
+    })();
+
+    // Test 26: Returning Personal QR Lookup & User Scoping Isolation
+    (() => {
+      const userAId = 'usr_alice_test_101';
+      const userBId = 'usr_bob_test_202';
+      const commonUpiId = 'ravi@upi';
+
+      // User B classifies the same person (Ravi) as Travel/Transport
+      supabaseService.saveMerchantPreference({
+        userId: userBId,
+        upiId: commonUpiId,
+        merchantName: 'Ravi Cab',
+        detectedMcc: null,
+        category: 'Transport & Fuel',
+        walletId: 'wallet_transport',
+        source: 'user',
+      });
+
+      const prefForUserA = supabaseService.getLocalPreference(userAId, commonUpiId);
+      const prefForUserB = supabaseService.getLocalPreference(userBId, commonUpiId);
+
+      assert(
+        'Personal QR User Scoping: Multi-user isolation prevents preference collisions for same UPI ID',
+        prefForUserA &&
+          prefForUserB &&
+          prefForUserA.walletId === 'wallet_friends' &&
+          prefForUserB.walletId === 'wallet_transport',
+        `User A suggests: ${prefForUserA?.walletId}, User B suggests: ${prefForUserB?.walletId}`
       );
 
       // Clean up and restore original user state so running tests does not disrupt user session
