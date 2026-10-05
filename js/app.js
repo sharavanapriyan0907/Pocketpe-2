@@ -15,6 +15,10 @@ import { SplitView } from './ui/splitView.js';
 import { ReceiveModal } from './ui/receiveModal.js';
 import { MoveModal } from './ui/moveModal.js';
 import { OnboardingManager } from './ui/onboarding.js';
+import { FraudModal } from './ui/fraudModal.js';
+import { CollectModal } from './ui/collectModal.js';
+import { SplitBillView } from './ui/splitBillView.js';
+import { UnitTests } from './tests/unitTests.js';
 
 class App {
   static init() {
@@ -38,9 +42,15 @@ class App {
     ReceiveModal.init();
     MoveModal.init();
     OnboardingManager.init();
+    FraudModal.init();
+    CollectModal.init();
+    SplitBillView.init();
 
     // 5. Initialize Desktop Stage Controls
     this.setupDesktopControls();
+
+    // 6. Run Automated Unit Tests on Startup
+    UnitTests.runAll();
 
     console.log('✨ PocketPe is ready. Every rupee has a purpose.');
   }
@@ -86,6 +96,14 @@ class App {
     if (desktopTourBtn) {
       desktopTourBtn.addEventListener('click', () => {
         OnboardingManager.open();
+      });
+    }
+
+    // Desktop Run Tests
+    const desktopTestsBtn = document.getElementById('btn-desktop-tests');
+    if (desktopTestsBtn) {
+      desktopTestsBtn.addEventListener('click', () => {
+        UnitTests.showTestResultsModal();
       });
     }
 

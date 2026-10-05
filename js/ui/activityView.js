@@ -3,8 +3,11 @@
    ========================================================================== */
 
 import { stateManager } from '../state.js';
+import { DEMO_MERCHANTS } from '../config.js';
 import { WalletEngine } from '../engines/walletEngine.js';
 import { CategoryEngine } from '../engines/categoryEngine.js';
+import { FraudEngine } from '../engines/fraudEngine.js';
+import { FraudModal } from './fraudModal.js';
 import { NavigationManager } from './navigation.js';
 import { SoundEngine } from './sound.js';
 
@@ -210,11 +213,23 @@ export class ActivityView {
       timeStyle: 'short',
     });
 
+    // Resolve UPI ID for merchant
+    let upiId = tx.upiId;
+    if (!upiId) {
+      const match = DEMO_MERCHANTS.find((m) => m.name.toLowerCase() === tx.merchantName.toLowerCase());
+      upiId = match ? match.upiId : (tx.merchantName.includes('@') ? tx.merchantName : tx.merchantName.toLowerCase().replace(/[^a-z0-9]/g, '') + '@upi');
+    }
+    const risk = FraudEngine.evaluateUpiRisk(upiId);
+
     body.innerHTML = `
       <div style="text-align: center; padding: 10px 0;">
         <div style="font-size: 2.75rem; margin-bottom: 4px;">${wallet?.icon || '🧾'}</div>
         <h3 class="h3" style="color: var(--text-primary);">${tx.merchantName}</h3>
-        <span class="badge badge-accent" style="margin-top: 4px;">${tx.category}</span>
+        <div class="mono" style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">${upiId}</div>
+        <div style="display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap;">
+          <span class="badge badge-accent">${tx.category}</span>
+          ${FraudModal.renderRiskBadgeHtml(upiId, true)}
+        </div>
         <div style="font-size: var(--text-4xl); font-weight: 800; color: ${isDebit ? 'var(--text-primary)' : 'var(--success)'}; margin-top: 8px;">
           ${isDebit ? '-' : '+'}${WalletEngine.formatRupee(tx.amount)}
         </div>
@@ -267,8 +282,31 @@ export class ActivityView {
     `;
 
     footer.innerHTML = `
-      <button class="btn btn-secondary" data-close-modal="modal-transaction-receipt">Close</button>
+      <div style="display: flex; gap: 10px; width: 100%;">
+        <button class="btn btn-secondary btn-sm" id="btn-receipt-report-upi" style="flex: 1; font-size: var(--text-xs); color: var(--danger);">
+          🚩 Report Recipient
+        </button>
+        <button class="btn btn-primary btn-sm" data-close-modal="modal-transaction-receipt" style="flex: 1;">
+          Close
+        </button>
+      </div>
     `;
+
+    // Click on risk pill to see details
+    body.querySelectorAll('[data-risk-upi]').forEach((pill) => {
+      pill.addEventListener('click', () => {
+        FraudModal.openRiskDetailModal(upiId, tx.merchantName);
+      });
+    });
+
+    // Report button
+    const repBtn = footer.querySelector('#btn-receipt-report-upi');
+    if (repBtn) {
+      repBtn.addEventListener('click', () => {
+        NavigationManager.closeModal('modal-transaction-receipt');
+        FraudModal.openReportModal(upiId, tx.merchantName);
+      });
+    }
 
     // Fix Category Click
     const fixSubmitBtn = body.querySelector('#btn-fix-category-submit');

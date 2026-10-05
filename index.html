@@ -56,6 +56,10 @@
           <span>✨</span> <span>Tour</span>
         </button>
 
+        <button class="desktop-btn" id="btn-desktop-tests" title="Run Unit Tests for Fraud Detection & Split Calculation">
+          <span>🧪</span> <span>Run Tests</span>
+        </button>
+
         <button class="desktop-btn" id="btn-desktop-reset" title="Reset to Initial Demo State">
           <span>🔄</span> <span>Reset Data</span>
         </button>
@@ -232,6 +236,110 @@
           <div class="modal-overlay" id="modal-onboarding" aria-hidden="true">
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="PocketPe Tour">
               <div class="sheet-grabber"></div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Feature 1: Fraud Report Modal -->
+          <div class="modal-overlay" id="modal-report-upi" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Report Suspicious UPI ID">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Report UPI ID</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-report-upi" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Feature 1: UPI Risk Breakdown & Appeal Modal -->
+          <div class="modal-overlay" id="modal-upi-risk-detail" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Community Risk Details">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Trust & Spam Score</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-upi-risk-detail" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Feature 1: High-Risk Confirmation Warning Interstitial -->
+          <div class="modal-overlay" id="modal-high-risk-warning" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="High-Risk Warning">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title" style="color: var(--danger);">Security Warning</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-high-risk-warning" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Incoming UPI Collect Requests Modal -->
+          <div class="modal-overlay" id="modal-collect-requests" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Incoming Money Requests">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Incoming Requests</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-collect-requests" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Feature 2: Split-Bill Wallet Modal -->
+          <div class="modal-overlay" id="modal-split-bill" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Split-Bill Wallet">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Split-Bill Wallet</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-split-bill" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Feature 2: Create Split Group Modal -->
+          <div class="modal-overlay" id="modal-create-group" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Create Split Group">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">New Group</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-create-group" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Feature 2: Add Shared Expense Modal -->
+          <div class="modal-overlay" id="modal-add-expense" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Add Shared Expense">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Add Expense</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-add-expense" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Automated Unit Tests Results Modal -->
+          <div class="modal-overlay" id="modal-unit-tests" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Unit Tests Results">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Automated Unit Tests</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-unit-tests" aria-label="Close">✕</button>
+              </div>
               <div class="sheet-body"></div>
               <div class="sheet-footer"></div>
             </div>

@@ -2,7 +2,14 @@
    POCKETPE - STATE MANAGER & PERSISTENCE
    ========================================================================== */
 
-import { APP_CONFIG, INITIAL_WALLETS, INITIAL_TRANSACTIONS } from './config.js';
+import {
+  APP_CONFIG,
+  INITIAL_WALLETS,
+  INITIAL_TRANSACTIONS,
+  INITIAL_FRAUD_DATA,
+  INITIAL_COLLECT_REQUESTS,
+  INITIAL_SPLIT_DATA,
+} from './config.js';
 
 class StateManager {
   constructor() {
@@ -16,6 +23,16 @@ class StateManager {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed.wallets && parsed.transactions) {
+          // Ensure new feature namespaces exist on legacy state
+          if (!parsed.fraudDetection) {
+            parsed.fraudDetection = JSON.parse(JSON.stringify(INITIAL_FRAUD_DATA));
+          }
+          if (!parsed.collectRequests) {
+            parsed.collectRequests = JSON.parse(JSON.stringify(INITIAL_COLLECT_REQUESTS));
+          }
+          if (!parsed.splitBill) {
+            parsed.splitBill = JSON.parse(JSON.stringify(INITIAL_SPLIT_DATA));
+          }
           return parsed;
         }
       }
@@ -36,6 +53,9 @@ class StateManager {
       learnedMerchants: {},
       isBalanceHidden: false,
       activeTab: 'home',
+      fraudDetection: JSON.parse(JSON.stringify(INITIAL_FRAUD_DATA)),
+      collectRequests: JSON.parse(JSON.stringify(INITIAL_COLLECT_REQUESTS)),
+      splitBill: JSON.parse(JSON.stringify(INITIAL_SPLIT_DATA)),
     };
   }
 
@@ -221,12 +241,239 @@ class StateManager {
     return this.state.isBalanceHidden;
   }
 
+  // --- Fraud Detection & Community Spam Helpers ---
+  getFraudData() {
+    if (!this.state.fraudDetection) {
+      this.state.fraudDetection = JSON.parse(JSON.stringify(INITIAL_FRAUD_DATA));
+    }
+    return this.state.fraudDetection;
+  }
+
+  getReportsForUpi(upiId) {
+    if (!upiId) return [];
+    const normalized = upiId.trim().toLowerCase();
+    const fraud = this.getFraudData();
+    return (fraud.reports || []).filter((r) => r.reportedUpiId.toLowerCase() === normalized);
+  }
+
+  addFraudReport(reportData) {
+    const fraud = this.getFraudData();
+    const normalizedUpi = reportData.reportedUpiId.trim().toLowerCase();
+
+    const newReport = {
+      id: `rep_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      reporterId: reportData.reporterId || this.state.user.id,
+      reporterTrust: reportData.reporterTrust !== undefined ? reportData.reporterTrust : 1.0,
+      reportedUpiId: normalizedUpi,
+      reason: reportData.reason,
+      details: reportData.details || '',
+      createdAt: new Date().toISOString(),
+      deviceId: reportData.deviceId || 'dev_current_user',
+    };
+
+    fraud.reports.unshift(newReport);
+
+    // Also register user as interacted
+    if (!fraud.interactions[normalizedUpi]) {
+      fraud.interactions[normalizedUpi] = [];
+    }
+    if (!fraud.interactions[normalizedUpi].includes(newReport.reporterId)) {
+      fraud.interactions[normalizedUpi].push(newReport.reporterId);
+    }
+
+    this.notify('fraud:reported', newReport);
+    return newReport;
+  }
+
+  submitAppeal(upiId, appealReason) {
+    const fraud = this.getFraudData();
+    const normalizedUpi = upiId.trim().toLowerCase();
+
+    const newAppeal = {
+      id: `app_${Date.now()}`,
+      upiId: normalizedUpi,
+      appealReason,
+      status: 'under_review',
+      createdAt: new Date().toISOString(),
+    };
+
+    if (!fraud.appeals) fraud.appeals = [];
+    fraud.appeals.unshift(newAppeal);
+
+    this.notify('fraud:appealed', newAppeal);
+    return newAppeal;
+  }
+
+  getAppealForUpi(upiId) {
+    if (!upiId) return null;
+    const normalizedUpi = upiId.trim().toLowerCase();
+    const fraud = this.getFraudData();
+    return (fraud.appeals || []).find((a) => a.upiId === normalizedUpi) || null;
+  }
+
+  recordInteraction(upiId, userId = null) {
+    if (!upiId) return;
+    const normalizedUpi = upiId.trim().toLowerCase();
+    const fraud = this.getFraudData();
+    const uid = userId || this.state.user.id;
+
+    if (!fraud.interactions[normalizedUpi]) {
+      fraud.interactions[normalizedUpi] = [];
+    }
+    if (!fraud.interactions[normalizedUpi].includes(uid)) {
+      fraud.interactions[normalizedUpi].push(uid);
+      this.notify('fraud:interaction_recorded', { upiId: normalizedUpi, userId: uid });
+    }
+  }
+
+  // --- Collect Requests Helpers ---
+  getCollectRequests() {
+    if (!this.state.collectRequests) {
+      this.state.collectRequests = JSON.parse(JSON.stringify(INITIAL_COLLECT_REQUESTS));
+    }
+    return this.state.collectRequests;
+  }
+
+  updateCollectRequestStatus(requestId, status) {
+    const requests = this.getCollectRequests();
+    const req = requests.find((r) => r.id === requestId);
+    if (req) {
+      req.status = status;
+      this.notify('collect:updated', req);
+      return true;
+    }
+    return false;
+  }
+
+  // --- Split-Bill Wallet Helpers ---
+  getSplitData() {
+    if (!this.state.splitBill) {
+      this.state.splitBill = JSON.parse(JSON.stringify(INITIAL_SPLIT_DATA));
+    }
+    return this.state.splitBill;
+  }
+
+  getSplitGroups() {
+    return this.getSplitData().groups || [];
+  }
+
+  getSplitGroup(groupId) {
+    return this.getSplitGroups().find((g) => g.id === groupId) || null;
+  }
+
+  getGroupMembers(groupId) {
+    const split = this.getSplitData();
+    return (split.groupMembers || []).filter((m) => m.groupId === groupId);
+  }
+
+  getGroupExpenses(groupId) {
+    const split = this.getSplitData();
+    return (split.expenses || []).filter((e) => e.groupId === groupId);
+  }
+
+  getGroupSettlements(groupId) {
+    const split = this.getSplitData();
+    return (split.settlements || []).filter((s) => s.groupId === groupId);
+  }
+
+  addSplitGroup(groupData) {
+    const split = this.getSplitData();
+    const groupId = `grp_${Date.now()}`;
+
+    const newGroup = {
+      id: groupId,
+      name: groupData.name,
+      category: groupData.category || 'General',
+      icon: groupData.icon || '👥',
+      createdBy: this.state.user.id,
+      createdAt: new Date().toISOString(),
+      phase2Pool: {
+        enabled: false,
+        targetPoolAmount: 0,
+        poolBalance: 0,
+        refundPolicy: 'equal',
+      },
+    };
+
+    split.groups.unshift(newGroup);
+
+    // Add current user as member
+    const currentMember = {
+      id: `mem_${Date.now()}_0`,
+      groupId,
+      userId: this.state.user.id,
+      name: `You (${this.state.user.name.split(' ')[0]})`,
+      upiId: 'sharath@okhdfcbank',
+      phone: '9876543210',
+      isCurrentUser: true,
+    };
+    split.groupMembers.push(currentMember);
+
+    // Add other members
+    if (Array.isArray(groupData.members)) {
+      groupData.members.forEach((m, idx) => {
+        split.groupMembers.push({
+          id: `mem_${Date.now()}_${idx + 1}`,
+          groupId,
+          userId: `usr_ext_${Date.now()}_${idx}`,
+          name: m.name || `Friend ${idx + 1}`,
+          upiId: m.upiId || `friend${idx + 1}@upi`,
+          phone: m.phone || '',
+          isCurrentUser: false,
+        });
+      });
+    }
+
+    this.notify('split:group_created', newGroup);
+    return newGroup;
+  }
+
+  addSplitExpense(expenseData) {
+    const split = this.getSplitData();
+    const newExpense = {
+      id: `exp_${Date.now()}`,
+      groupId: expenseData.groupId,
+      description: expenseData.description,
+      amount: Number(expenseData.amount),
+      paidBy: expenseData.paidBy,
+      splitType: expenseData.splitType || 'equal',
+      createdAt: new Date().toISOString(),
+      shares: expenseData.shares || [],
+    };
+
+    split.expenses.unshift(newExpense);
+    this.notify('split:expense_added', newExpense);
+    return newExpense;
+  }
+
+  recordSettlement(settlementData) {
+    const split = this.getSplitData();
+    const newSettlement = {
+      id: `stl_${Date.now()}`,
+      groupId: settlementData.groupId,
+      fromMemberId: settlementData.fromMemberId,
+      toMemberId: settlementData.toMemberId,
+      amount: Number(settlementData.amount),
+      status: 'completed',
+      createdAt: new Date().toISOString(),
+      txId: settlementData.txId || null,
+    };
+
+    if (!split.settlements) split.settlements = [];
+    split.settlements.unshift(newSettlement);
+    this.notify('split:settled', newSettlement);
+    return newSettlement;
+  }
+
   // --- Reset All Data ---
   resetToDemoData() {
     this.state.wallets = JSON.parse(JSON.stringify(INITIAL_WALLETS));
     this.state.transactions = JSON.parse(JSON.stringify(INITIAL_TRANSACTIONS));
     this.state.learnedMerchants = {};
     this.state.isBalanceHidden = false;
+    this.state.fraudDetection = JSON.parse(JSON.stringify(INITIAL_FRAUD_DATA));
+    this.state.collectRequests = JSON.parse(JSON.stringify(INITIAL_COLLECT_REQUESTS));
+    this.state.splitBill = JSON.parse(JSON.stringify(INITIAL_SPLIT_DATA));
     this.saveState();
     this.notify('state:reset', this.state);
   }

@@ -40,3 +40,39 @@ The server will start on `http://localhost:8000` (or the next available port) an
 - **Web Audio API**: Custom built-in sound engine for tactile, harmonious micro-interaction feedback (success chord, cascade melody, protection alert, soft tap).
 - **Design System**: Fully responsive mobile-first phone chassis simulator with desktop presentation bar, dark/light theme switching, and live brand accent palette customization (Indigo, Emerald, Violet, Orange, Cyan).
 - **LocalStorage State Persistence**: Saves wallets, transaction history, split rules, and learned merchant memories.
+
+---
+
+## 🛡️ Feature 1: Fraud Detection (Community Spam Reporting)
+
+*A Truecaller-like safety layer for UPI payments and collect requests.*
+
+- **Ratio-Based Spam Score**: Computes $\frac{\sum (\text{Reporter Trust} \times \text{Time Decay})}{\text{Unique Users Interacted}}$ instead of raw counts, protecting popular merchants from false spikes.
+- **30-Day Half-Life Decay**: Older reports naturally lose weight over time ($0.5^{\text{days}/30}$).
+- **Trust Weighting & Anti-Abuse**: Differentiates reporter credibility, enforces a 5-report/hour rate limit, and blocks duplicate reports.
+- **Heuristic Extra Signals**: Auto-flags accounts $<14$ days old, collect request velocity $>10$/hr, and beneficiary bank name mismatches.
+- **Graduated Warnings**:
+  - *Low Risk*: Subtle badge, normal payment flow.
+  - *Caution*: Warning banner requiring 1 extra tap.
+  - *High Risk*: Full blocking warning modal with scam category breakdown (e.g. *"84% reported Fake Bill Scam"*), 1-tap **"Decline & Report"**, and explicit confirmation to proceed.
+- **Appeals & Under Review**: Merchants can contest flags, applying an **"Under Review"** status that lowers warning severity during review.
+
+---
+
+## 👥 Feature 2: Split-Bill Wallet (Smart Student Ledger)
+
+*Shared expense tracking and debt settlement integrated into PocketPe's virtual wallets.*
+
+- **Phase 1 Ledger + Phase 2 Shared Pool Schema**: Tracks who owes whom with schema readiness for pooled balances.
+- **Exact Paisa Rounding**: ₹100 split 3 ways yields ₹33.34, ₹33.33, and ₹33.33—sums strictly to ₹100.00 with zero float discrepancies.
+- **Min-Cash-Flow Debt Simplification**: Reduces circular multi-party debts into the fewest direct 1:1 settlement transactions.
+- **Virtual Wallet Integration**: 1-tap **"Settle Up"** pays directly out of the user's **"Friends & Social"** purpose wallet.
+- **Polite Nudges**: Student-friendly reminder templates (e.g. *"Hey! Quick nudge from Ravi — your share for Goa Trip is ₹350. Settle up on PocketPe whenever you can!"*).
+
+---
+
+## 🧪 Automated Unit Test Suite
+
+PocketPe includes an automated unit test suite verifying both features on boot and interactively in the app:
+- Click **"🧪 Run Tests (12/12)"** on the desktop bar to run live assertions for spam score ratio math, time decay half-life, trust weighting, threshold gating, extra signals, appeals, duplicate prevention, equal split rounding, custom split validation, multi-payer net balances, min-cash-flow debt simplification, and reminder generation.
+

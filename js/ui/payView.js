@@ -8,6 +8,8 @@ import { DEMO_MERCHANTS } from '../config.js';
 import { CategoryEngine } from '../engines/categoryEngine.js';
 import { WalletEngine } from '../engines/walletEngine.js';
 import { TransactionEngine } from '../engines/transactionEngine.js';
+import { FraudEngine, RISK_LEVELS } from '../engines/fraudEngine.js';
+import { FraudModal } from './fraudModal.js';
 import { NavigationManager } from './navigation.js';
 import { SoundEngine } from './sound.js';
 
@@ -21,6 +23,10 @@ export class PayView {
     if (!this.container) return;
 
     this.render();
+
+    // Re-render when community reports or appeals update
+    stateManager.subscribe('fraud:reported', () => this.render());
+    stateManager.subscribe('fraud:appealed', () => this.render());
   }
 
   static render() {
@@ -29,7 +35,7 @@ export class PayView {
     this.container.innerHTML = `
       <div class="section-header">
         <h2 class="h2">Scan & Pay</h2>
-        <span class="prototype-tag">Demo Payment</span>
+        <span class="prototype-tag">Community Shielded</span>
       </div>
 
       <!-- Simulated QR Scanner Viewport -->
@@ -51,28 +57,37 @@ export class PayView {
           <span>🔦</span> <span>Flashlight</span>
         </button>
         <button class="btn btn-secondary btn-sm" id="btn-custom-qr-input" style="flex: 1;">
-          <span>✏️</span> <span>Custom Merchant</span>
+          <span>✏️</span> <span>Custom Pay / UPI</span>
         </button>
       </div>
 
       <!-- Quick Demo QR Merchants -->
       <div class="demo-merchants-section">
-        <div class="title">Or tap a simulated Merchant QR to test:</div>
+        <div class="title">Tap a simulated Merchant / Peer QR to test:</div>
         <div class="merchants-scroll-list">
-          ${DEMO_MERCHANTS.map((m) => `
-            <div class="merchant-item-card" data-merchant-id="${m.id}">
+          ${DEMO_MERCHANTS.map((m) => {
+            const risk = FraudEngine.evaluateUpiRisk(m.upiId);
+            const isHigh = risk.level === RISK_LEVELS.HIGH;
+            const isCaution = risk.level === RISK_LEVELS.CAUTION;
+
+            return `
+            <div class="merchant-item-card ${isHigh ? 'merchant-item-card-risk' : ''}" data-merchant-id="${m.id}">
               <div class="merchant-info">
                 <div class="merchant-avatar">${m.icon}</div>
                 <div class="merchant-meta">
-                  <h4>${m.name}</h4>
-                  <p>${m.category} • ${m.description}</p>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <h4>${m.name}</h4>
+                    ${isHigh || isCaution ? FraudModal.renderRiskBadgeHtml(m.upiId, false) : ''}
+                  </div>
+                  <p>${m.category} • <span class="mono" style="font-size: 0.7rem;">${m.upiId || ''}</span></p>
                 </div>
               </div>
               <div class="merchant-amount-tag">
                 ${WalletEngine.formatRupee(m.defaultAmount)}
               </div>
             </div>
-          `).join('')}
+          `;
+          }).join('')}
         </div>
       </div>
 
@@ -103,6 +118,7 @@ export class PayView {
             amount: merchant.defaultAmount,
             category: merchant.category,
             icon: merchant.icon,
+            upiId: merchant.upiId,
           });
         }
       });
@@ -143,19 +159,64 @@ export class PayView {
           amount: 2500, // Transport wallet typically has ₹800
           category: 'Transport & Fuel',
           icon: '⛽',
+          upiId: 'shell.petrol@paytm',
         });
       });
     }
   }
 
-  // --- Payment Execution Flow ---
-  static initiatePaymentFlow({ merchantName, amount, category, icon = '🛍️' }) {
-    // 1. Run through categorization engine
+  // --- Payment Execution Flow with Fraud Check ---
+  static initiatePaymentFlow({ merchantName, amount, category, icon = '🛍️', upiId = null, skipRiskCheck = false }) {
+    // 1. Resolve UPI ID
+    let resolvedUpiId = upiId;
+    if (!resolvedUpiId) {
+      const match = DEMO_MERCHANTS.find((m) => m.name.toLowerCase() === merchantName.toLowerCase());
+      if (match && match.upiId) {
+        resolvedUpiId = match.upiId;
+      } else if (merchantName.includes('@')) {
+        resolvedUpiId = merchantName.trim();
+      } else {
+        resolvedUpiId = merchantName.toLowerCase().replace(/[^a-z0-9]/g, '') + '@upi';
+      }
+    }
+
+    // 2. Evaluate Community Spam / Risk
+    const risk = FraudEngine.evaluateUpiRisk(resolvedUpiId);
+
+    // 3. High Risk Interstitial Warning Check
+    if (!skipRiskCheck && risk.level === RISK_LEVELS.HIGH) {
+      FraudModal.showHighRiskWarning({
+        upiId: resolvedUpiId,
+        displayName: merchantName,
+        amount,
+        onProceed: () => {
+          this.initiatePaymentFlow({
+            merchantName,
+            amount,
+            category,
+            icon,
+            upiId: resolvedUpiId,
+            skipRiskCheck: true,
+          });
+        },
+        onDeclineAndReport: () => {
+          NavigationManager.closeModal('modal-confirm-payment');
+        },
+      });
+      return;
+    }
+
+    // Record interaction in fraud engine
+    stateManager.recordInteraction(resolvedUpiId);
+
+    // 4. Run through categorization engine
     const classification = CategoryEngine.classifyMerchant(merchantName, amount);
     const recommendedWallet = classification.recommendedWallet || stateManager.getFreeMoneyWallet();
 
     this.currentPaymentData = {
       merchantName,
+      upiId: resolvedUpiId,
+      risk,
       amount: Number(amount),
       category: classification.category,
       icon,
@@ -184,17 +245,33 @@ export class PayView {
 
     const isSufficient = selectedWallet.balance >= p.amount;
     const remainingAfterPayment = selectedWallet.balance - p.amount;
+    const risk = FraudEngine.evaluateUpiRisk(p.upiId);
 
     body.innerHTML = `
-      <!-- Merchant Header -->
+      <!-- Recipient Header -->
       <div style="text-align: center; padding: 6px 0;">
         <div style="font-size: 2.75rem; margin-bottom: 4px;">${p.icon}</div>
         <h3 class="h3" style="color: var(--text-primary);">${p.merchantName}</h3>
-        <div style="display: flex; justify-content: center; gap: 6px; margin-top: 4px;">
+        <div class="mono" style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">${p.upiId}</div>
+        
+        <div style="display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap;">
           <span class="badge badge-accent">${p.category}</span>
           ${p.isLearned ? '<span class="badge badge-success">✨ Learned from you</span>' : ''}
+          ${FraudModal.renderRiskBadgeHtml(p.upiId, true)}
         </div>
-        <div class="amount-input-hero" style="padding: 10px 0;">
+
+        <!-- Community Risk Banner -->
+        <div class="card" style="padding: 8px 12px; margin: 8px 0 4px; display: flex; align-items: center; justify-content: space-between; background: ${FraudModal.getRiskBgColor(risk.level)}; border: 1px solid ${risk.level === RISK_LEVELS.HIGH ? 'var(--danger-border)' : 'transparent'};">
+          <div style="display: flex; align-items: center; gap: 6px; font-size: 0.72rem; font-weight: 600; color: ${FraudModal.getRiskColor(risk.level)}; text-align: left;">
+            <span>${risk.level === RISK_LEVELS.HIGH ? '🚨' : risk.level === RISK_LEVELS.CAUTION ? '⚠️' : '🛡️'}</span>
+            <span>${risk.reasonSummary}</span>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="btn-view-payment-risk-details" style="padding: 2px 8px; font-size: 0.65rem; height: auto;">
+            Details
+          </button>
+        </div>
+
+        <div class="amount-input-hero" style="padding: 6px 0;">
           <span class="amount-currency">₹</span>
           <span style="font-size: var(--text-4xl); font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums;">
             ${p.amount.toLocaleString('en-IN')}
@@ -251,8 +328,36 @@ export class PayView {
       <button class="btn btn-primary" id="btn-execute-payment">
         <span>Pay ${WalletEngine.formatRupee(p.amount)} (Demo)</span>
       </button>
-      <button class="btn btn-ghost btn-sm" data-close-modal="modal-confirm-payment">Cancel</button>
+      <div style="display: flex; gap: 8px; width: 100%;">
+        <button class="btn btn-secondary btn-sm" id="btn-report-current-payment" style="flex: 1; font-size: var(--text-xs); color: var(--danger);">
+          🚩 Report Recipient
+        </button>
+        <button class="btn btn-ghost btn-sm" data-close-modal="modal-confirm-payment" style="flex: 1;">Cancel</button>
+      </div>
     `;
+
+    // Click on risk pill or details button to open risk modal
+    const viewRiskBtn = body.querySelector('#btn-view-payment-risk-details');
+    if (viewRiskBtn) {
+      viewRiskBtn.addEventListener('click', () => {
+        FraudModal.openRiskDetailModal(p.upiId, p.merchantName);
+      });
+    }
+
+    body.querySelectorAll('[data-risk-upi]').forEach((pill) => {
+      pill.addEventListener('click', () => {
+        FraudModal.openRiskDetailModal(p.upiId, p.merchantName);
+      });
+    });
+
+    // Report recipient button
+    const reportBtn = footer.querySelector('#btn-report-current-payment');
+    if (reportBtn) {
+      reportBtn.addEventListener('click', () => {
+        FraudModal.openReportModal(p.upiId, p.merchantName);
+      });
+    }
+
 
     // Dropdown change listener
     const walletSelect = body.querySelector('#select-payment-wallet');
@@ -587,6 +692,7 @@ export class PayView {
         amount: amt,
         category: cat,
         icon: '🏷️',
+        upiId: name.includes('@') ? name : null,
       });
     });
 

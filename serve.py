@@ -69,8 +69,8 @@ def run_server():
     for attempt in range(max_attempts):
         try:
             handler = PocketPeHTTPRequestHandler
-            socketserver.TCPServer.allow_reuse_address = True
-            httpd = socketserver.TCPServer(("", port), handler)
+            socketserver.ThreadingTCPServer.allow_reuse_address = True
+            httpd = socketserver.ThreadingTCPServer(("", port), handler)
             break
         except OSError as e:
             if getattr(e, 'errno', None) in (48, 98, 10048) or 'already in use' in str(e).lower():

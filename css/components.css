@@ -605,3 +605,48 @@
   background: var(--bg-subtle);
   color: var(--text-muted);
 }
+
+/* --- Community Fraud & Spam Risk Badges --- */
+.badge-risk-high {
+  background: var(--danger-light);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+  font-weight: 700;
+}
+
+.badge-risk-caution {
+  background: var(--warning-light);
+  color: var(--warning);
+  border: 1px solid var(--warning-border);
+  font-weight: 700;
+}
+
+.badge-risk-low {
+  background: var(--success-light);
+  color: var(--success);
+  border: 1px solid var(--success-border);
+  font-weight: 700;
+}
+
+.inline-risk-pill {
+  transition: all var(--transition-fast);
+}
+
+.inline-risk-pill:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.1);
+}
+
+.merchant-item-card-risk {
+  border-left: 3.5px solid var(--danger) !important;
+}
+
+.card-risk-alert {
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.15);
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}

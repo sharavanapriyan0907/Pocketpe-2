@@ -1,14 +1,14 @@
-/* ==========================================================================
-   POCKETPE - HOME VIEW CONTROLLER
-   ========================================================================== */
-
 import { stateManager } from '../state.js';
 import { WalletEngine } from '../engines/walletEngine.js';
+import { FraudEngine } from '../engines/fraudEngine.js';
 import { NavigationManager } from './navigation.js';
 import { SoundEngine } from './sound.js';
 import { MoveModal } from './moveModal.js';
 import { ReceiveModal } from './receiveModal.js';
 import { SplitView } from './splitView.js';
+import { SplitBillView } from './splitBillView.js';
+import { CollectModal } from './collectModal.js';
+import { FraudModal } from './fraudModal.js';
 
 export class HomeView {
   static init() {
@@ -20,6 +20,8 @@ export class HomeView {
     // Subscribe to state changes
     stateManager.subscribe('state:changed', () => this.render());
     stateManager.subscribe('privacy:toggled', () => this.render());
+    stateManager.subscribe('collect:updated', () => this.render());
+    stateManager.subscribe('split:settled', () => this.render());
   }
 
   static render() {
@@ -101,15 +103,52 @@ export class HomeView {
         </div>
       </div>
 
+      <!-- Pending Collect Request Alert Banner (if any) -->
+      ${(() => {
+        const pendingCollects = stateManager.getCollectRequests().filter((r) => r.status === 'pending');
+        if (pendingCollects.length === 0) return '';
+        const first = pendingCollects[0];
+        const risk = FraudEngine.evaluateUpiRisk(first.upiId);
+        return `
+          <div class="card card-interactive" id="banner-pending-collect" style="padding: 12px 14px; background: ${FraudModal.getRiskBgColor(risk.level)}; border: 1.5px solid ${risk.level === 'HIGH' ? 'var(--danger-border)' : 'var(--warning-border)'}; display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-size: 1.35rem;">${risk.level === 'HIGH' ? '🚨' : '🔔'}</span>
+              <div>
+                <div style="font-size: var(--text-xs); font-weight: 700; color: ${FraudModal.getRiskColor(risk.level)};">
+                  ${pendingCollects.length} INCOMING MONEY REQUEST${pendingCollects.length > 1 ? 'S' : ''}
+                </div>
+                <div style="font-size: 0.72rem; color: var(--text-primary); font-weight: 600;">
+                  ${first.requesterName} (${WalletEngine.formatRupee(first.amount)})
+                </div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="badge ${FraudModal.getRiskBadgeClass(risk.level)}" style="font-size: 0.65rem;">
+                ${risk.level} RISK
+              </span>
+              <span style="font-size: 0.8rem; color: var(--text-muted);">→</span>
+            </div>
+          </div>
+        `;
+      })()}
+
       <!-- Quick Action Tiles -->
-      <div class="quick-actions-grid">
+      <div class="quick-actions-grid" style="grid-template-columns: repeat(3, 1fr);">
         <div class="action-tile" id="action-receive-money" role="button" tabindex="0">
           <div class="action-icon">📥</div>
-          <span class="action-label">Receive Money</span>
+          <span class="action-label">Receive</span>
         </div>
         <div class="action-tile" id="action-quick-pay" role="button" tabindex="0">
           <div class="action-icon">⚡</div>
           <span class="action-label">Scan & Pay</span>
+        </div>
+        <div class="action-tile" id="action-split-bills" role="button" tabindex="0">
+          <div class="action-icon">🍕</div>
+          <span class="action-label">Split Bills</span>
+        </div>
+        <div class="action-tile" id="action-collect-requests" role="button" tabindex="0">
+          <div class="action-icon">🔔</div>
+          <span class="action-label">Requests</span>
         </div>
         <div class="action-tile" id="action-move-money" role="button" tabindex="0">
           <div class="action-icon">🔄</div>
@@ -205,6 +244,27 @@ export class HomeView {
       });
     }
 
+    const splitBillsBtn = document.getElementById('action-split-bills');
+    if (splitBillsBtn) {
+      splitBillsBtn.addEventListener('click', () => {
+        SplitBillView.open();
+      });
+    }
+
+    const collectRequestsBtn = document.getElementById('action-collect-requests');
+    if (collectRequestsBtn) {
+      collectRequestsBtn.addEventListener('click', () => {
+        CollectModal.open();
+      });
+    }
+
+    const pendingBanner = document.getElementById('banner-pending-collect');
+    if (pendingBanner) {
+      pendingBanner.addEventListener('click', () => {
+        CollectModal.open();
+      });
+    }
+
     const moveBtn = document.getElementById('action-move-money');
     if (moveBtn) {
       moveBtn.addEventListener('click', () => {
@@ -236,11 +296,11 @@ export class HomeView {
       });
     });
 
-    // Mock notification bell
+    // Mock notification bell -> opens collect requests modal
     const notifBtn = document.getElementById('btn-home-notifications');
     if (notifBtn) {
       notifBtn.addEventListener('click', () => {
-        NavigationManager.showToast('🛡️ Payment protection is active. All money is safe.', 'info');
+        CollectModal.open();
       });
     }
   }
@@ -310,6 +370,11 @@ export class HomeView {
             `
                 )
                 .join('')}
+        ${wallet.id === 'wallet_friends' ? `
+          <button class="btn btn-secondary btn-sm" id="btn-detail-open-split" style="margin-top: 8px; width: 100%; font-size: var(--text-xs);">
+            🍕 Open Split-Bill Groups (Hostel & Trips)
+          </button>
+        ` : ''}
         </div>
       `;
 
@@ -319,6 +384,15 @@ export class HomeView {
         moveHereBtn.addEventListener('click', () => {
           NavigationManager.closeModal('modal-wallet-detail');
           MoveModal.open(null, wallet.id);
+        });
+      }
+
+      // Quick split button
+      const splitBtn = bodyEl.querySelector('#btn-detail-open-split');
+      if (splitBtn) {
+        splitBtn.addEventListener('click', () => {
+          NavigationManager.closeModal('modal-wallet-detail');
+          SplitBillView.open();
         });
       }
     }

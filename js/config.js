@@ -173,6 +173,7 @@ export const DEMO_MERCHANTS = [
   {
     id: 'm_abc_rest',
     name: 'ABC Restaurant',
+    upiId: 'abcrestaurant@hdfcbank',
     category: 'Food & Dining',
     defaultAmount: 350,
     icon: '🍽️',
@@ -183,6 +184,7 @@ export const DEMO_MERCHANTS = [
   {
     id: 'm_starbucks',
     name: 'Starbucks Coffee',
+    upiId: 'starbucks.order@icici',
     category: 'Food & Dining',
     defaultAmount: 220,
     icon: '☕',
@@ -193,6 +195,7 @@ export const DEMO_MERCHANTS = [
   {
     id: 'm_uber',
     name: 'Uber / City Taxi',
+    upiId: 'uber.india@axisbank',
     category: 'Transport & Fuel',
     defaultAmount: 240,
     icon: '🚕',
@@ -203,6 +206,7 @@ export const DEMO_MERCHANTS = [
   {
     id: 'm_shell',
     name: 'Shell Fuel Station',
+    upiId: 'shell.petrol@paytm',
     category: 'Transport & Fuel',
     defaultAmount: 500,
     icon: '⛽',
@@ -213,6 +217,7 @@ export const DEMO_MERCHANTS = [
   {
     id: 'm_apollo',
     name: 'Apollo Pharmacy',
+    upiId: 'apollo.retail@hdfcbank',
     category: 'Health & Wellness',
     defaultAmount: 420,
     icon: '💊',
@@ -223,6 +228,7 @@ export const DEMO_MERCHANTS = [
   {
     id: 'm_campus_books',
     name: 'Campus Book Store',
+    upiId: 'campusbooks@sbi',
     category: 'College & Education',
     defaultAmount: 650,
     icon: '📚',
@@ -233,6 +239,7 @@ export const DEMO_MERCHANTS = [
   {
     id: 'm_barber',
     name: 'XYZ Barber & Salon',
+    upiId: 'xyzsalon@okaxis',
     category: 'Personal Care',
     defaultAmount: 300,
     icon: '💈',
@@ -243,6 +250,7 @@ export const DEMO_MERCHANTS = [
   {
     id: 'm_zara',
     name: 'Zara Lifestyle',
+    upiId: 'zara.india@kotak',
     category: 'Shopping & Apparel',
     defaultAmount: 1200,
     icon: '🛍️',
@@ -253,6 +261,7 @@ export const DEMO_MERCHANTS = [
   {
     id: 'm_friend_rohan',
     name: 'Pay Friend (Rohan)',
+    upiId: 'rohan.sharma@okhdfcbank',
     category: 'Friends & Social',
     defaultAmount: 500,
     icon: '👤',
@@ -260,4 +269,214 @@ export const DEMO_MERCHANTS = [
     description: 'Personal peer-to-peer payback',
     matchingWallet: 'wallet_friends',
   },
+  {
+    id: 'm_electricity_refund',
+    name: 'Electricity Helpdesk (Scam Test)',
+    upiId: 'powerbill.helpdesk@ybl',
+    category: 'Housing',
+    defaultAmount: 2450,
+    icon: '⚠️',
+    mcc: '4900',
+    description: 'Reported: Fake electricity disconnection scam',
+    matchingWallet: 'wallet_free',
+  },
+  {
+    id: 'm_lottery_scam',
+    name: 'Lucky Draw Office (Scam Test)',
+    upiId: 'reward.claim981@okaxis',
+    category: 'General Expense',
+    defaultAmount: 999,
+    icon: '🚨',
+    mcc: '0000',
+    description: 'Reported: Lottery processing fee fraud',
+    matchingWallet: 'wallet_free',
+  },
 ];
+
+export const INITIAL_FRAUD_DATA = {
+  // Threshold: min 5 reports to trigger community risk badge
+  minReportThreshold: 5,
+  reports: [
+    // 8 reports for powerbill.helpdesk@ybl
+    { id: 'rep_01', reporterId: 'usr_101', reporterTrust: 1.0, reportedUpiId: 'powerbill.helpdesk@ybl', reason: 'Fake collect request', details: 'Sent fake electricity disconnection bill', createdAt: new Date(Date.now() - 2 * 86400000).toISOString(), deviceId: 'dev_101' },
+    { id: 'rep_02', reporterId: 'usr_102', reporterTrust: 0.9, reportedUpiId: 'powerbill.helpdesk@ybl', reason: 'Fake collect request', details: 'Claimed to be Power Corporation', createdAt: new Date(Date.now() - 3 * 86400000).toISOString(), deviceId: 'dev_102' },
+    { id: 'rep_03', reporterId: 'usr_103', reporterTrust: 1.0, reportedUpiId: 'powerbill.helpdesk@ybl', reason: 'Impersonation', details: 'Pretending to be BESCOM agent', createdAt: new Date(Date.now() - 4 * 86400000).toISOString(), deviceId: 'dev_103' },
+    { id: 'rep_04', reporterId: 'usr_104', reporterTrust: 0.8, reportedUpiId: 'powerbill.helpdesk@ybl', reason: 'Fake collect request', details: 'Threatened immediate power cut', createdAt: new Date(Date.now() - 5 * 86400000).toISOString(), deviceId: 'dev_104' },
+    { id: 'rep_05', reporterId: 'usr_105', reporterTrust: 1.0, reportedUpiId: 'powerbill.helpdesk@ybl', reason: 'Repeated money requests', details: 'Spamming ₹2,450 collect requests', createdAt: new Date(Date.now() - 6 * 86400000).toISOString(), deviceId: 'dev_105' },
+    { id: 'rep_06', reporterId: 'usr_106', reporterTrust: 0.95, reportedUpiId: 'powerbill.helpdesk@ybl', reason: 'Fake collect request', details: 'Phishing collect notification', createdAt: new Date(Date.now() - 7 * 86400000).toISOString(), deviceId: 'dev_106' },
+    { id: 'rep_07', reporterId: 'usr_107', reporterTrust: 0.85, reportedUpiId: 'powerbill.helpdesk@ybl', reason: 'Other', details: 'Scam caller asked to approve UPI request', createdAt: new Date(Date.now() - 8 * 86400000).toISOString(), deviceId: 'dev_107' },
+    { id: 'rep_08', reporterId: 'usr_108', reporterTrust: 1.0, reportedUpiId: 'powerbill.helpdesk@ybl', reason: 'Fake collect request', details: 'Fraudulent utility bill', createdAt: new Date(Date.now() - 9 * 86400000).toISOString(), deviceId: 'dev_108' },
+
+    // 12 reports for reward.claim981@okaxis
+    ...Array.from({ length: 12 }).map((_, i) => ({
+      id: `rep_lottery_${i + 1}`,
+      reporterId: `usr_20${i + 1}`,
+      reporterTrust: 0.9,
+      reportedUpiId: 'reward.claim981@okaxis',
+      reason: 'Prize or lottery scam',
+      details: 'SMS claimed I won ₹50,000, asked ₹999 fee',
+      createdAt: new Date(Date.now() - (i + 1) * 86400000).toISOString(),
+      deviceId: `dev_20${i + 1}`,
+    })),
+
+    // 1 isolated report for ABC Restaurant (below threshold of 5 -> Low / not flagged)
+    { id: 'rep_abc_01', reporterId: 'usr_999', reporterTrust: 0.5, reportedUpiId: 'abcrestaurant@hdfcbank', reason: 'Other', details: 'Order delayed', createdAt: new Date(Date.now() - 40 * 86400000).toISOString(), deviceId: 'dev_999' },
+  ],
+  interactions: {
+    'powerbill.helpdesk@ybl': ['usr_101', 'usr_102', 'usr_103', 'usr_104', 'usr_105', 'usr_106', 'usr_107', 'usr_108', 'usr_109', 'usr_110'],
+    'reward.claim981@okaxis': ['usr_201', 'usr_202', 'usr_203', 'usr_204', 'usr_205', 'usr_206', 'usr_207', 'usr_208', 'usr_209', 'usr_210', 'usr_211', 'usr_212', 'usr_213', 'usr_214'],
+    'abcrestaurant@hdfcbank': Array.from({ length: 60 }).map((_, i) => `usr_abc_${i}`),
+    'rohan.sharma@okhdfcbank': ['usr_001', 'usr_friend_1', 'usr_friend_2', 'usr_friend_3'],
+    'starbucks.order@icici': Array.from({ length: 45 }).map((_, i) => `usr_sb_${i}`),
+  },
+  upiRegistry: {
+    'powerbill.helpdesk@ybl': {
+      upiId: 'powerbill.helpdesk@ybl',
+      registeredName: 'Raju K. (Individual)',
+      handleName: 'Electricity Board Support Desk',
+      registeredDaysAgo: 4,
+      collectVelocity1h: 18,
+      nameMismatch: true,
+    },
+    'reward.claim981@okaxis': {
+      upiId: 'reward.claim981@okaxis',
+      registeredName: 'Prepaid SIM Card #882',
+      handleName: 'Lucky Draw Reward Office',
+      registeredDaysAgo: 2,
+      collectVelocity1h: 27,
+      nameMismatch: true,
+    },
+    'abcrestaurant@hdfcbank': {
+      upiId: 'abcrestaurant@hdfcbank',
+      registeredName: 'ABC Gourmet Diners Pvt Ltd',
+      handleName: 'ABC Restaurant',
+      registeredDaysAgo: 640,
+      collectVelocity1h: 2,
+      nameMismatch: false,
+    },
+    'rohan.sharma@okhdfcbank': {
+      upiId: 'rohan.sharma@okhdfcbank',
+      registeredName: 'Rohan Sharma',
+      handleName: 'Rohan Sharma',
+      registeredDaysAgo: 380,
+      collectVelocity1h: 1,
+      nameMismatch: false,
+    },
+  },
+  appeals: [],
+};
+
+export const INITIAL_COLLECT_REQUESTS = [
+  {
+    id: 'req_scam_01',
+    upiId: 'powerbill.helpdesk@ybl',
+    requesterName: 'Electricity Board Support Desk',
+    amount: 2450,
+    note: '🚨 Urgent: Unpaid disconnection clearance fee',
+    date: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+    status: 'pending',
+  },
+  {
+    id: 'req_friend_02',
+    upiId: 'rohan.sharma@okhdfcbank',
+    requesterName: 'Rohan Sharma',
+    amount: 320,
+    note: 'Hostel midnight Maggi & snacks split 🍜',
+    date: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+    status: 'pending',
+  },
+];
+
+export const INITIAL_SPLIT_DATA = {
+  groups: [
+    {
+      id: 'grp_hostel_302',
+      name: 'Hostel Room 302 🍕',
+      category: 'Housing',
+      icon: '🏠',
+      createdBy: 'usr_001',
+      createdAt: new Date(Date.now() - 10 * 86400000).toISOString(),
+      // Phase 2 readiness
+      phase2Pool: {
+        enabled: false,
+        targetPoolAmount: 0,
+        poolBalance: 0,
+        refundPolicy: 'equal',
+      },
+    },
+    {
+      id: 'grp_goa_trip',
+      name: 'Goa Weekend Trip 🏖️',
+      category: 'Travel',
+      icon: '✈️',
+      createdBy: 'usr_001',
+      createdAt: new Date(Date.now() - 4 * 86400000).toISOString(),
+      phase2Pool: {
+        enabled: false,
+        targetPoolAmount: 0,
+        poolBalance: 0,
+        refundPolicy: 'equal',
+      },
+    },
+  ],
+  groupMembers: [
+    // Hostel Room 302
+    { id: 'mem_01', groupId: 'grp_hostel_302', userId: 'usr_001', name: 'You (Sharath)', upiId: 'sharath@okhdfcbank', phone: '9876543210', isCurrentUser: true },
+    { id: 'mem_02', groupId: 'grp_hostel_302', userId: 'usr_rohan', name: 'Rohan Sharma', upiId: 'rohan.sharma@okhdfcbank', phone: '9876543211', isCurrentUser: false },
+    { id: 'mem_03', groupId: 'grp_hostel_302', userId: 'usr_priya', name: 'Priya Patel', upiId: 'priya.patel@okicici', phone: '9876543212', isCurrentUser: false },
+    { id: 'mem_04', groupId: 'grp_hostel_302', userId: 'usr_aditya', name: 'Aditya Verma', upiId: 'aditya.v@oksbi', phone: '9876543213', isCurrentUser: false },
+
+    // Goa Trip
+    { id: 'mem_g01', groupId: 'grp_goa_trip', userId: 'usr_001', name: 'You (Sharath)', upiId: 'sharath@okhdfcbank', phone: '9876543210', isCurrentUser: true },
+    { id: 'mem_g02', groupId: 'grp_goa_trip', userId: 'usr_rohan', name: 'Rohan Sharma', upiId: 'rohan.sharma@okhdfcbank', phone: '9876543211', isCurrentUser: false },
+    { id: 'mem_g03', groupId: 'grp_goa_trip', userId: 'usr_priya', name: 'Priya Patel', upiId: 'priya.patel@okicici', phone: '9876543212', isCurrentUser: false },
+  ],
+  expenses: [
+    {
+      id: 'exp_01',
+      groupId: 'grp_hostel_302',
+      description: 'Hostel Wi-Fi Bill (Nov)',
+      amount: 1200,
+      paidBy: 'mem_01', // You paid
+      splitType: 'equal',
+      createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+      shares: [
+        { memberId: 'mem_01', shareAmount: 300 },
+        { memberId: 'mem_02', shareAmount: 300 },
+        { memberId: 'mem_03', shareAmount: 300 },
+        { memberId: 'mem_04', shareAmount: 300 },
+      ],
+    },
+    {
+      id: 'exp_02',
+      groupId: 'grp_hostel_302',
+      description: 'Pizza & Cold Drinks',
+      amount: 800,
+      paidBy: 'mem_02', // Rohan paid
+      splitType: 'equal',
+      createdAt: new Date(Date.now() - 1 * 86400000).toISOString(),
+      shares: [
+        { memberId: 'mem_01', shareAmount: 200 },
+        { memberId: 'mem_02', shareAmount: 200 },
+        { memberId: 'mem_03', shareAmount: 200 },
+        { memberId: 'mem_04', shareAmount: 200 },
+      ],
+    },
+    {
+      id: 'exp_g01',
+      groupId: 'grp_goa_trip',
+      description: 'Beach Shack Seafood Dinner',
+      amount: 2100,
+      paidBy: 'mem_g01', // You paid
+      splitType: 'equal',
+      createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+      shares: [
+        { memberId: 'mem_g01', shareAmount: 700 },
+        { memberId: 'mem_g02', shareAmount: 700 },
+        { memberId: 'mem_g03', shareAmount: 700 },
+      ],
+    },
+  ],
+  settlements: [],
+};
+
