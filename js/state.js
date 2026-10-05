@@ -592,6 +592,16 @@ class StateManager {
 
   // --- Reset All Data ---
   resetToDemoData() {
+    this.state.user = {
+      id: 'usr_001',
+      name: 'Sharath Kumar',
+      email: null,
+      isAuthenticated: false,
+      greeting: 'Good morning',
+      simulatedBank: 'HDFC Simulated Account',
+      accountNumber: '••• 4892',
+      supabaseUser: null,
+    };
     this.state.wallets = JSON.parse(JSON.stringify(INITIAL_WALLETS));
     this.state.transactions = JSON.parse(JSON.stringify(INITIAL_TRANSACTIONS));
     this.state.learnedMerchants = {};
@@ -600,6 +610,7 @@ class StateManager {
     this.state.collectRequests = JSON.parse(JSON.stringify(INITIAL_COLLECT_REQUESTS));
     this.state.splitBill = JSON.parse(JSON.stringify(INITIAL_SPLIT_DATA));
     this.saveState();
+    this.notify('auth:changed', this.state.user);
     this.notify('state:reset', this.state);
   }
 }

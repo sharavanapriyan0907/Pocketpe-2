@@ -115,7 +115,14 @@ export class EditProfileModal {
 
         try {
           if (stateManager.isUserAuthenticated()) {
-            await supabaseService.updateProfile({ fullName: newName });
+            try {
+              await supabaseService.updateProfile({ fullName: newName });
+            } catch (err) {
+              console.warn('Notice while updating remote Supabase profile:', err);
+              if (!err.message?.includes('Auth session missing')) {
+                throw err;
+              }
+            }
           }
           
           stateManager.state.user.name = newName;

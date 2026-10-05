@@ -16,6 +16,9 @@ export class UnitTests {
     const results = [];
     const startTime = performance.now();
 
+    // Snapshot original user state to prevent tests from dirtying active session
+    const originalUserState = JSON.parse(JSON.stringify(stateManager.getState().user || {}));
+
     const assert = (description, condition, details = '') => {
       if (condition) {
         results.push({ name: description, passed: true, details });
@@ -379,26 +382,13 @@ export class UnitTests {
 
     // Test 14: Non-Anonymous Auth Enforcement (Validates required credentials)
     (() => {
-      let threwEmailError = false;
-      let threwPasswordError = false;
-
-      // Attempt signup with blank/invalid email
-      try {
-        supabaseService.signUp('', '123456', 'Test');
-      } catch (e) {
-        threwEmailError = true;
-      }
-
-      // Attempt signup with short password
-      try {
-        supabaseService.signUp('test@univ.edu', '123', 'Test');
-      } catch (e) {
-        threwPasswordError = true;
-      }
+      const invalidEmail = supabaseService.validateCredentials('', '123456', 'Test');
+      const invalidPass = supabaseService.validateCredentials('test@univ.edu', '123', 'Test');
+      const valid = supabaseService.validateCredentials('student@univ.edu', 'secret123', 'Test Student');
 
       assert(
         'Non-Anonymous Enforcement: Strictly requires valid email and min 6-char password',
-        threwEmailError === true || threwPasswordError === true,
+        invalidEmail.valid === false && invalidPass.valid === false && valid.valid === true,
         'Validated non-anonymous authentication rules'
       );
     })();
@@ -486,8 +476,16 @@ export class UnitTests {
         `Display Name: ${updated}`
       );
 
-      // Clean up back to demo user
-      stateManager.resetToDemoData();
+      // Clean up and restore original user state so running tests does not disrupt user session
+      if (originalUserState && originalUserState.isAuthenticated && originalUserState.supabaseUser) {
+        stateManager.setAuthUser(originalUserState.supabaseUser);
+      } else if (originalUserState && originalUserState.id) {
+        stateManager.state.user = originalUserState;
+        stateManager.loadUserScopedData(originalUserState.id);
+        stateManager.notify('auth:changed', stateManager.state.user);
+      } else {
+        stateManager.resetToDemoData();
+      }
     })();
 
     const endTime = performance.now();

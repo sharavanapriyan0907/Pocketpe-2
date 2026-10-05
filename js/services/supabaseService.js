@@ -111,6 +111,22 @@ class SupabaseService {
   }
 
   /**
+   * Validate credentials (enforces non-anonymous authentication)
+   */
+  validateCredentials(email, password, fullName = '') {
+    const trimmedEmail = (email || '').trim().toLowerCase();
+    const trimmedName = (fullName || '').trim();
+
+    if (!trimmedEmail || !trimmedEmail.includes('@')) {
+      return { valid: false, error: 'Please enter a valid email address.' };
+    }
+    if (!password || password.length < 6) {
+      return { valid: false, error: 'Password must be at least 6 characters.' };
+    }
+    return { valid: true, email: trimmedEmail, fullName: trimmedName };
+  }
+
+  /**
    * Email and password registration (Strictly non-anonymous)
    */
   async signUp(email, password, fullName) {
@@ -119,16 +135,13 @@ class SupabaseService {
       throw new Error('Supabase client is not initialized. Please configure your Supabase Project URL and Anon Key.');
     }
 
-    const trimmedEmail = (email || '').trim().toLowerCase();
-    const trimmedName = (fullName || '').trim();
-
-    if (!trimmedEmail || !trimmedEmail.includes('@')) {
-      throw new Error('Please enter a valid email address.');
+    const validation = this.validateCredentials(email, password, fullName);
+    if (!validation.valid) {
+      throw new Error(validation.error);
     }
 
-    if (!password || password.length < 6) {
-      throw new Error('Password must be at least 6 characters.');
-    }
+    const trimmedEmail = validation.email;
+    const trimmedName = validation.fullName;
 
     const { data, error } = await this.client.auth.signUp({
       email: trimmedEmail,
@@ -228,6 +241,13 @@ class SupabaseService {
     const trimmedName = (fullName || '').trim();
     if (!trimmedName) {
       throw new Error('Please enter a valid display name.');
+    }
+
+    // Check if active Supabase session exists before remote update
+    const session = await this.getSession();
+    if (!session) {
+      console.log('Notice: No active remote Supabase session to update profile metadata.');
+      return null;
     }
 
     const { data, error } = await this.client.auth.updateUser({
