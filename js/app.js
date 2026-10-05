@@ -78,21 +78,64 @@ class App {
       this.updateDesktopAuthUI();
 
       // Subscribe to Supabase auth events
-      supabaseService.onAuthStateChange((event, session) => {
+      supabaseService.onAuthStateChange(async (event, session) => {
         console.log('🔄 Supabase Auth Event:', event);
         if (session?.user) {
           stateManager.setAuthUser(session.user);
+          await this.syncUserDataWithSupabase(session.user.id);
         } else if (event === 'SIGNED_OUT') {
           stateManager.clearAuthUser();
         }
         this.updateDesktopAuthUI();
       });
 
-      stateManager.subscribe('auth:changed', () => {
+      stateManager.subscribe('auth:changed', async () => {
         this.updateDesktopAuthUI();
+        const user = stateManager.getState().user;
+        if (user?.isAuthenticated && user?.id) {
+          await this.syncUserDataWithSupabase(user.id);
+        }
+      });
+
+      // Hook transactions and wallet updates to Supabase cloud sync
+      stateManager.subscribe('transaction:added', (tx) => {
+        const user = stateManager.getState().user;
+        if (user?.isAuthenticated && user?.id) {
+          supabaseService.syncTransactionToCloud(user.id, tx);
+          supabaseService.syncWalletsToCloud(user.id, stateManager.getWallets());
+        }
+      });
+
+      stateManager.subscribe('wallet:updated', () => {
+        const user = stateManager.getState().user;
+        if (user?.isAuthenticated && user?.id) {
+          supabaseService.syncWalletsToCloud(user.id, stateManager.getWallets());
+        }
+      });
+
+      stateManager.subscribe('wallet:created', () => {
+        const user = stateManager.getState().user;
+        if (user?.isAuthenticated && user?.id) {
+          supabaseService.syncWalletsToCloud(user.id, stateManager.getWallets());
+        }
       });
     } catch (e) {
       console.warn('Supabase auth initialization check completed with notice:', e);
+    }
+  }
+
+  static async syncUserDataWithSupabase(userId) {
+    if (!supabaseService.isConfigured() || !userId) return;
+    try {
+      const cloudWallets = await supabaseService.fetchWalletsFromCloud(userId);
+      if (cloudWallets && cloudWallets.length > 0) {
+        stateManager.state.wallets = cloudWallets;
+        stateManager.notify('state:changed');
+      } else {
+        await supabaseService.syncWalletsToCloud(userId, stateManager.getWallets());
+      }
+    } catch (e) {
+      console.warn('Supabase sync notice:', e);
     }
   }
 

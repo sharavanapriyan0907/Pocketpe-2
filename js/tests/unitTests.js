@@ -7,6 +7,8 @@
 
 import { FraudEngine, RISK_LEVELS } from '../engines/fraudEngine.js';
 import { SplitEngine } from '../engines/splitEngine.js';
+import { UpiQrEngine } from '../engines/upiQrEngine.js';
+import { CategoryEngine } from '../engines/categoryEngine.js';
 import { supabaseService } from '../services/supabaseService.js';
 import { stateManager } from '../state.js';
 import { NavigationManager } from '../ui/navigation.js';
@@ -474,6 +476,48 @@ export class UnitTests {
         'Profile Editing: Allows updating student display name and persists in state',
         updated === 'Updated Student Name',
         `Display Name: ${updated}`
+      );
+    })();
+
+    // =========================================================================
+    // FEATURE 4: UPI QR CODE PARSING & MCC AUTO-DEDUCTION TESTS
+    // =========================================================================
+
+    // Test 19: Standard UPI QR URI Parsing
+    (() => {
+      const rawUri = 'upi://pay?pa=chaiwala@oksbi&pn=Chai%20Point&am=45.50&mc=5812&cu=INR&tn=Evening%20Snack';
+      const parsed = UpiQrEngine.parse(rawUri);
+
+      assert(
+        'UPI QR Parsing: Extracts payee VPA, merchant name, amount, and MCC code from standard upi:// URI',
+        parsed &&
+          parsed.isValid &&
+          parsed.isUpiQr &&
+          parsed.upiId === 'chaiwala@oksbi' &&
+          parsed.merchantName === 'Chai Point' &&
+          parsed.amount === 45.5 &&
+          parsed.mcc === '5812' &&
+          parsed.category === 'Food & Dining',
+        `Parsed: ${JSON.stringify(parsed)}`
+      );
+    })();
+
+    // Test 20: MCC Code-based Category Resolution & Auto-Deduction Target
+    (() => {
+      // MCC 5812 = Food & Dining
+      const foodClass = CategoryEngine.classifyMerchant('Unknown Tea Stall', 50, 'Food & Dining', '5812');
+      // MCC 5541 = Transport & Fuel
+      const fuelClass = CategoryEngine.classifyMerchant('Highway Fuel Pump', 1200, 'Transport & Fuel', '5541');
+
+      assert(
+        'MCC Auto-Deduction: Automatically maps Merchant Category Codes to correct purpose wallets',
+        foodClass.category === 'Food & Dining' &&
+          foodClass.recommendedWallet &&
+          (foodClass.recommendedWallet.id === 'wallet_food' || foodClass.recommendedWallet.category === 'Food & Dining') &&
+          fuelClass.category === 'Transport & Fuel' &&
+          fuelClass.recommendedWallet &&
+          (fuelClass.recommendedWallet.id === 'wallet_transport' || fuelClass.recommendedWallet.category === 'Transport & Fuel'),
+        `Food wallet: ${foodClass.recommendedWallet?.id}, Fuel wallet: ${fuelClass.recommendedWallet?.id}`
       );
 
       // Clean up and restore original user state so running tests does not disrupt user session

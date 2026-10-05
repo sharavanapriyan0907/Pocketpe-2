@@ -63,12 +63,12 @@ export class CategoryEngine {
   /**
    * Intelligently classify a merchant and recommend the best wallet
    */
-  static classifyMerchant(merchantName, amount = 0) {
-    if (!merchantName) {
+  static classifyMerchant(merchantName, amount = 0, explicitCategory = null, explicitMcc = null) {
+    if (!merchantName && !explicitCategory) {
       return this.fallbackClassification();
     }
 
-    const cleanName = merchantName.trim();
+    const cleanName = (merchantName || 'Merchant').trim();
     const lowerName = cleanName.toLowerCase();
     const wallets = stateManager.getWallets();
 
@@ -87,7 +87,22 @@ export class CategoryEngine {
       };
     }
 
-    // 2. Check Seeded Demo Merchants database
+    // 2. Check Explicit Category (from UPI QR code MCC or user hint)
+    if (explicitCategory) {
+      const targetWallet = this.findWalletByCategory(explicitCategory) || stateManager.getFreeMoneyWallet();
+      return {
+        merchantName: cleanName,
+        category: explicitCategory,
+        recommendedWallet: targetWallet,
+        isLearned: false,
+        source: explicitMcc ? 'upi_mcc_code' : 'explicit_hint',
+        icon: targetWallet?.icon || '🏷️',
+        mcc: explicitMcc,
+        reason: explicitMcc ? `Auto-detected from UPI MCC #${explicitMcc} (${explicitCategory}).` : `Categorized as ${explicitCategory}.`,
+      };
+    }
+
+    // 3. Check Seeded Demo Merchants database
     const seeded = DEMO_MERCHANTS.find(
       (m) => m.name.toLowerCase() === lowerName || lowerName.includes(m.name.toLowerCase())
     );

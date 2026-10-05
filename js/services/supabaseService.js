@@ -264,7 +264,7 @@ class SupabaseService {
   }
 
   /**
-   * Test connection to Supabase endpoint
+   * Test connection to Supabase endpoint and check if database tables exist
    */
   async testConnection() {
     try {
@@ -274,9 +274,122 @@ class SupabaseService {
       if (error && !error.message.includes('Auth session missing')) {
         return { success: false, message: error.message };
       }
-      return { success: true, message: 'Connected successfully to Supabase' };
+
+      // Check if tables are queryable
+      let tablesStatus = 'Tables ready';
+      try {
+        const { error: tableErr } = await this.client.from('wallets').select('id').limit(1);
+        if (tableErr) {
+          if (tableErr.code === '42P01') {
+            tablesStatus = 'Auth connected, but database tables need schema setup (run supabase_schema.sql)';
+          } else if (tableErr.message) {
+            tablesStatus = `Auth connected (${tableErr.message})`;
+          }
+        }
+      } catch (err) {
+        // Ignored if offline
+      }
+
+      return { 
+        success: true, 
+        message: `Connected successfully to Supabase! (${tablesStatus})` 
+      };
     } catch (e) {
       return { success: false, message: e.message || 'Connection failed' };
+    }
+  }
+
+  // --- Database Sync Operations ---
+
+  /**
+   * Sync wallets to Supabase PostgreSQL table
+   */
+  async syncWalletsToCloud(userId, wallets) {
+    if (!this.isConfigured() || !this.client || !userId) return;
+    try {
+      const records = wallets.map((w) => ({
+        id: w.id,
+        user_id: userId,
+        name: w.name,
+        icon: w.icon,
+        color: w.color,
+        balance: w.balance,
+        target_amount: w.targetAmount || 0,
+        monthly_limit: w.monthlyLimit || 0,
+        allocation_percentage: w.allocationPercentage || 0,
+        category: w.category || '',
+        is_free_money: !!w.isFreeMoney,
+        updated_at: new Date().toISOString(),
+      }));
+
+      const { error } = await this.client.from('wallets').upsert(records, { onConflict: 'user_id, id' });
+      if (error) {
+        console.warn('Supabase wallets sync notice:', error.message);
+      }
+    } catch (e) {
+      console.warn('Could not sync wallets to Supabase:', e.message);
+    }
+  }
+
+  /**
+   * Fetch wallets from Supabase PostgreSQL table
+   */
+  async fetchWalletsFromCloud(userId) {
+    if (!this.isConfigured() || !this.client || !userId) return null;
+    try {
+      const { data, error } = await this.client
+        .from('wallets')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (error || !data || data.length === 0) return null;
+
+      return data.map((row) => ({
+        id: row.id,
+        name: row.name,
+        icon: row.icon,
+        color: row.color,
+        balance: Number(row.balance),
+        targetAmount: Number(row.target_amount),
+        monthlyLimit: Number(row.monthly_limit),
+        allocationPercentage: Number(row.allocation_percentage),
+        category: row.category,
+        isFreeMoney: row.is_free_money,
+      }));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Sync single transaction to Supabase
+   */
+  async syncTransactionToCloud(userId, tx) {
+    if (!this.isConfigured() || !this.client || !userId || !tx) return;
+    try {
+      const { error } = await this.client.from('transactions').upsert([
+        {
+          id: tx.id,
+          user_id: userId,
+          merchant_name: tx.merchantName,
+          amount: tx.amount,
+          type: tx.type || 'debit',
+          category: tx.category || '',
+          wallet_id: tx.walletId || null,
+          wallet_name: tx.walletName || null,
+          wallet_icon: tx.walletIcon || null,
+          upi_id: tx.upiId || null,
+          mcc: tx.mcc || null,
+          status: tx.status || 'success',
+          created_at: tx.timestamp || new Date().toISOString(),
+        },
+      ], { onConflict: 'user_id, id' });
+
+      if (error) {
+        console.warn('Supabase transaction sync notice:', error.message);
+      }
+    } catch (e) {
+      console.warn('Could not sync transaction to Supabase:', e.message);
     }
   }
 }
