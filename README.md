@@ -71,8 +71,23 @@ The server will start on `http://localhost:8000` (or the next available port) an
 
 ---
 
+## 🔐 Feature 3: Supabase Email/Password Authentication
+
+*Real user authentication and state isolation backed by Supabase Auth.*
+
+- **Non-Anonymous Security**: Full email/password registration and login with input validation (RFC email format, min 6-char password, matching password confirmation).
+- **User.ID Exposure**: Exposes the authenticated Supabase `user.id` (UUID) across the application state via `stateManager.getUserId()`.
+- **User-Scoped Data Isolation**: Automatically isolates and partitions virtual wallets, transactions, and learned merchant category preferences per authenticated Supabase user (`pocketpe_user_{userId}_data`).
+- **Profile Management**: Displays user credentials, initials avatar, copyable Supabase user.id, and supports updating display names with Supabase metadata sync.
+- **Runtime Supabase Settings**: Interactive in-app modal to view, test, and update your Supabase Project URL and Anon Key on the fly.
+
+---
+
 ## 🧪 Automated Unit Test Suite
 
-PocketPe includes an automated unit test suite verifying both features on boot and interactively in the app:
-- Click **"🧪 Run Tests (12/12)"** on the desktop bar to run live assertions for spam score ratio math, time decay half-life, trust weighting, threshold gating, extra signals, appeals, duplicate prevention, equal split rounding, custom split validation, multi-payer net balances, min-cash-flow debt simplification, and reminder generation.
+PocketPe includes an automated unit test suite with **18 passing assertions** verifying features on boot and interactively in the app:
+- Click **"🧪 Run Tests"** on the desktop bar to run live assertions for:
+  - Spam score ratio math, 30-day time decay half-life, trust weighting, 5-report threshold gating, extra signals, appeals, duplicate report prevention.
+  - Equal split exact integer paisa rounding, custom split validation, multi-payer net balances, min-cash-flow debt simplification, reminder copy generation.
+  - Supabase client configuration, non-anonymous credential validation, global `user.id` exposure, user-scoped wallet and merchant preference isolation, sign out/clear auth flow, and profile metadata updating.
 

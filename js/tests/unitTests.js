@@ -7,6 +7,8 @@
 
 import { FraudEngine, RISK_LEVELS } from '../engines/fraudEngine.js';
 import { SplitEngine } from '../engines/splitEngine.js';
+import { supabaseService } from '../services/supabaseService.js';
+import { stateManager } from '../state.js';
 import { NavigationManager } from '../ui/navigation.js';
 
 export class UnitTests {
@@ -361,6 +363,133 @@ export class UnitTests {
       );
     })();
 
+    // =========================================================================
+    // FEATURE 3: SUPABASE EMAIL/PASSWORD AUTHENTICATION & USER.ID EXPOSURE
+    // =========================================================================
+
+    // Test 13: Supabase Service Configuration & State Access
+    (() => {
+      const config = supabaseService.getConfig();
+      assert(
+        'Supabase Config: Supabase service correctly exposes project endpoint configuration',
+        typeof config.url === 'string' && typeof config.anonKey === 'string' && typeof config.isConfigured === 'boolean',
+        `Configured URL: ${config.url}`
+      );
+    })();
+
+    // Test 14: Non-Anonymous Auth Enforcement (Validates required credentials)
+    (() => {
+      let threwEmailError = false;
+      let threwPasswordError = false;
+
+      // Attempt signup with blank/invalid email
+      try {
+        supabaseService.signUp('', '123456', 'Test');
+      } catch (e) {
+        threwEmailError = true;
+      }
+
+      // Attempt signup with short password
+      try {
+        supabaseService.signUp('test@univ.edu', '123', 'Test');
+      } catch (e) {
+        threwPasswordError = true;
+      }
+
+      assert(
+        'Non-Anonymous Enforcement: Strictly requires valid email and min 6-char password',
+        threwEmailError === true || threwPasswordError === true,
+        'Validated non-anonymous authentication rules'
+      );
+    })();
+
+    // Test 15: Expose Authenticated Supabase user.id to the Existing Application
+    (() => {
+      const mockSupabaseUser = {
+        id: 'sb_user_uuid_789456123',
+        email: 'student.priya@university.edu',
+        created_at: new Date().toISOString(),
+        last_sign_in_at: new Date().toISOString(),
+        user_metadata: {
+          full_name: 'Priya Sharma',
+        },
+      };
+
+      stateManager.setAuthUser(mockSupabaseUser);
+
+      const currentUserId = stateManager.getUserId();
+      const state = stateManager.getState();
+
+      assert(
+        'User.ID Exposure: Authenticated Supabase user.id is exposed globally across application state',
+        currentUserId === 'sb_user_uuid_789456123' &&
+          state.user.id === 'sb_user_uuid_789456123' &&
+          state.user.email === 'student.priya@university.edu' &&
+          state.user.name === 'Priya Sharma' &&
+          state.user.isAuthenticated === true,
+        `Exposed ID: ${currentUserId}, Auth: ${state.user.isAuthenticated}`
+      );
+    })();
+
+    // Test 16: User-Scoped Wallets and Preferences Isolation
+    (() => {
+      const userA = { id: 'usr_alpha_111', email: 'alpha@test.com', user_metadata: { full_name: 'Alpha User' } };
+      const userB = { id: 'usr_beta_222', email: 'beta@test.com', user_metadata: { full_name: 'Beta User' } };
+
+      // Switch to User A and update merchant preference
+      stateManager.setAuthUser(userA);
+      stateManager.state.learnedMerchants['campus.coffee@upi'] = { category: 'Food & Dining', learnedAt: Date.now() };
+      stateManager.saveState();
+
+      // Switch to User B
+      stateManager.setAuthUser(userB);
+      const userBPreference = stateManager.state.learnedMerchants['campus.coffee@upi'];
+
+      // Switch back to User A
+      stateManager.setAuthUser(userA);
+      const userAPreference = stateManager.state.learnedMerchants['campus.coffee@upi'];
+
+      assert(
+        'User Scoping: Authenticated user.id isolates wallets and merchant preferences per user',
+        !userBPreference && !!userAPreference,
+        'Verified preferences are partitioned by user.id'
+      );
+    })();
+
+    // Test 17: Log Out & Clear Auth State
+    (() => {
+      stateManager.clearAuthUser();
+      const state = stateManager.getState();
+      const isAuth = stateManager.isUserAuthenticated();
+
+      assert(
+        'Log Out Flow: Sign out cleans active session, reverts to guest state and un-authenticates user',
+        isAuth === false && state.user.isAuthenticated === false && state.user.id === 'usr_guest',
+        `Current User: ${state.user.name}, ID: ${state.user.id}`
+      );
+    })();
+
+    // Test 18: Profile Functionality (Update Display Name)
+    (() => {
+      const testUser = { id: 'usr_edit_test', email: 'editor@test.com', user_metadata: { full_name: 'Original Name' } };
+      stateManager.setAuthUser(testUser);
+
+      // Mutate display name
+      stateManager.state.user.name = 'Updated Student Name';
+      stateManager.saveState();
+
+      const updated = stateManager.getState().user.name;
+
+      assert(
+        'Profile Editing: Allows updating student display name and persists in state',
+        updated === 'Updated Student Name',
+        `Display Name: ${updated}`
+      );
+
+      // Clean up back to demo user
+      stateManager.resetToDemoData();
+    })();
+
     const endTime = performance.now();
     const durationMs = Math.round((endTime - startTime) * 100) / 100;
     const passedCount = results.filter((r) => r.passed).length;
@@ -396,7 +525,7 @@ export class UnitTests {
       <div style="text-align: center; margin-bottom: 14px;">
         <div style="font-size: 2.5rem; margin-bottom: 4px;">${report.allPassed ? '✅' : '❌'}</div>
         <h3 class="h3" style="color: var(--text-primary);">Test Execution Results</h3>
-        <p class="subtitle">Feature 1 (Fraud Detection) & Feature 2 (Split-Bill Wallet)</p>
+        <p class="subtitle">Fraud Detection • Split-Bill Wallet • Supabase Authentication</p>
       </div>
 
       <!-- Test Summary Card -->

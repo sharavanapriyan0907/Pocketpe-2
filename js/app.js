@@ -18,6 +18,10 @@ import { OnboardingManager } from './ui/onboarding.js';
 import { FraudModal } from './ui/fraudModal.js';
 import { CollectModal } from './ui/collectModal.js';
 import { SplitBillView } from './ui/splitBillView.js';
+import { supabaseService } from './services/supabaseService.js';
+import { AuthModal } from './ui/authModal.js';
+import { SupabaseConfigModal } from './ui/supabaseConfigModal.js';
+import { EditProfileModal } from './ui/editProfileModal.js';
 import { UnitTests } from './tests/unitTests.js';
 
 class App {
@@ -45,14 +49,69 @@ class App {
     FraudModal.init();
     CollectModal.init();
     SplitBillView.init();
+    AuthModal.init();
+    SupabaseConfigModal.init();
+    EditProfileModal.init();
 
-    // 5. Initialize Desktop Stage Controls
+    // 5. Initialize Supabase Auth Session
+    this.initSupabaseAuth();
+
+    // 6. Initialize Desktop Stage Controls
     this.setupDesktopControls();
 
-    // 6. Run Automated Unit Tests on Startup
+    // 7. Run Automated Unit Tests on Startup
     UnitTests.runAll();
 
     console.log('✨ PocketPe is ready. Every rupee has a purpose.');
+  }
+
+  static async initSupabaseAuth() {
+    try {
+      await supabaseService.init();
+
+      // Check current session
+      const user = await supabaseService.getUser();
+      if (user) {
+        stateManager.setAuthUser(user);
+      }
+
+      this.updateDesktopAuthUI();
+
+      // Subscribe to Supabase auth events
+      supabaseService.onAuthStateChange((event, session) => {
+        console.log('🔄 Supabase Auth Event:', event);
+        if (session?.user) {
+          stateManager.setAuthUser(session.user);
+        } else if (event === 'SIGNED_OUT') {
+          stateManager.clearAuthUser();
+        }
+        this.updateDesktopAuthUI();
+      });
+
+      stateManager.subscribe('auth:changed', () => {
+        this.updateDesktopAuthUI();
+      });
+    } catch (e) {
+      console.warn('Supabase auth initialization check completed with notice:', e);
+    }
+  }
+
+  static updateDesktopAuthUI() {
+    const authBtn = document.getElementById('btn-desktop-auth');
+    const authLabel = document.getElementById('label-desktop-auth');
+    if (!authBtn || !authLabel) return;
+
+    const state = stateManager.getState();
+    if (state.user?.isAuthenticated) {
+      const shortName = (state.user.name || 'Account').split(' ')[0];
+      authBtn.classList.add('active');
+      authBtn.innerHTML = `<span>👤</span> <span id="label-desktop-auth">${shortName}</span>`;
+      authBtn.title = `Signed in as ${state.user.email} (ID: ${state.user.id})`;
+    } else {
+      authBtn.classList.remove('active');
+      authBtn.innerHTML = `<span>🔐</span> <span id="label-desktop-auth">Sign In</span>`;
+      authBtn.title = 'Sign in or create Supabase account';
+    }
   }
 
   static setupDesktopControls() {
@@ -104,6 +163,19 @@ class App {
     if (desktopTestsBtn) {
       desktopTestsBtn.addEventListener('click', () => {
         UnitTests.showTestResultsModal();
+      });
+    }
+
+    // Desktop Supabase Auth / Account Button
+    const desktopAuthBtn = document.getElementById('btn-desktop-auth');
+    if (desktopAuthBtn) {
+      desktopAuthBtn.addEventListener('click', () => {
+        if (stateManager.isUserAuthenticated()) {
+          NavigationManager.switchTab('profile');
+        } else {
+          AuthModal.open('login');
+        }
+        SoundEngine.playTap();
       });
     }
 

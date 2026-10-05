@@ -12,9 +12,17 @@ export const APP_CONFIG = {
     ACCENT: 'pocketpe_accent',
     LEARNED_MERCHANTS: 'pocketpe_learned_merchants',
     HAS_ONBOARDED: 'pocketpe_has_onboarded',
+    SUPABASE_URL: 'pocketpe_supabase_url',
+    SUPABASE_ANON_KEY: 'pocketpe_supabase_anon_key',
+    USER_SCOPED_PREFIX: 'pocketpe_user_',
   },
   DEFAULT_ACCENT: 'blue',
   DEFAULT_THEME: 'system',
+  SUPABASE: {
+    // Default / placeholder credentials (can be overridden via localStorage or in-app settings)
+    DEFAULT_URL: 'https://xyzcompany.supabase.co',
+    DEFAULT_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder',
+  },
 };
 
 export const WALLET_PRESETS = [

@@ -44,9 +44,12 @@ class StateManager {
       user: {
         id: 'usr_001',
         name: 'Sharath Kumar',
+        email: null,
+        isAuthenticated: false,
         greeting: 'Good morning',
         simulatedBank: 'HDFC Simulated Account',
         accountNumber: '••• 4892',
+        supabaseUser: null,
       },
       wallets: JSON.parse(JSON.stringify(INITIAL_WALLETS)),
       transactions: JSON.parse(JSON.stringify(INITIAL_TRANSACTIONS)),
@@ -62,8 +65,130 @@ class StateManager {
   saveState() {
     try {
       localStorage.setItem(APP_CONFIG.STORAGE_KEYS.APP_STATE, JSON.stringify(this.state));
+      if (this.state.user?.isAuthenticated && this.state.user?.id) {
+        this.saveUserScopedData(this.state.user.id);
+      }
     } catch (e) {
       console.error('Failed to save state to localStorage', e);
+    }
+  }
+
+  // --- Supabase Authentication & User-Scoped Data Helpers ---
+  getUserId() {
+    return this.state.user?.id || 'usr_001';
+  }
+
+  isUserAuthenticated() {
+    return !!this.state.user?.isAuthenticated;
+  }
+
+  setAuthUser(supabaseUser) {
+    if (!supabaseUser) {
+      return this.clearAuthUser();
+    }
+
+    const prevUserId = this.state.user?.id;
+    const newUserId = supabaseUser.id;
+    const fullName = supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'PocketPe User';
+
+    // Persist previous user state if transitioning
+    if (this.state.user?.isAuthenticated && prevUserId && prevUserId !== newUserId) {
+      this.saveUserScopedData(prevUserId);
+    }
+
+    this.state.user = {
+      ...this.state.user,
+      id: newUserId,
+      email: supabaseUser.email,
+      name: fullName,
+      isAuthenticated: true,
+      supabaseUser: {
+        id: supabaseUser.id,
+        email: supabaseUser.email,
+        createdAt: supabaseUser.created_at,
+        lastSignInAt: supabaseUser.last_sign_in_at,
+        metadata: supabaseUser.user_metadata || {},
+      },
+    };
+
+    // Load or initialize user-specific wallets and merchant preferences
+    this.loadUserScopedData(newUserId);
+
+    console.log(`👤 Exposing authenticated Supabase user.id: ${newUserId}`);
+    this.notify('auth:changed', this.state.user);
+    this.notify('state:changed');
+    return this.state.user;
+  }
+
+  clearAuthUser() {
+    if (this.state.user?.isAuthenticated && this.state.user?.id) {
+      this.saveUserScopedData(this.state.user.id);
+    }
+
+    this.state.user = {
+      id: 'usr_guest',
+      name: 'Guest User',
+      email: null,
+      isAuthenticated: false,
+      greeting: 'Welcome',
+      simulatedBank: 'Simulated Demo Bank',
+      accountNumber: '••• 0000',
+      supabaseUser: null,
+    };
+
+    // Revert to demo/guest state
+    this.loadUserScopedData('usr_guest');
+
+    console.log('👤 Cleared authenticated user, reverted to guest');
+    this.notify('auth:changed', this.state.user);
+    this.notify('state:changed');
+    return this.state.user;
+  }
+
+  loadUserScopedData(userId) {
+    if (!userId) return false;
+    const storageKey = `${APP_CONFIG.STORAGE_KEYS.USER_SCOPED_PREFIX || 'pocketpe_user_'}${userId}_data`;
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.wallets) && parsed.wallets.length > 0) {
+          this.state.wallets = parsed.wallets;
+        }
+        if (parsed.learnedMerchants && typeof parsed.learnedMerchants === 'object') {
+          this.state.learnedMerchants = parsed.learnedMerchants;
+        }
+        if (Array.isArray(parsed.transactions)) {
+          this.state.transactions = parsed.transactions;
+        }
+        return true;
+      }
+    } catch (e) {
+      console.warn('Could not load user-scoped data:', e);
+    }
+
+    // Initialize fresh default wallets for new authenticated user
+    if (userId !== 'usr_001' && userId !== 'usr_guest') {
+      this.state.wallets = JSON.parse(JSON.stringify(INITIAL_WALLETS));
+      this.state.learnedMerchants = {};
+      this.saveUserScopedData(userId);
+    }
+    return false;
+  }
+
+  saveUserScopedData(userId) {
+    if (!userId) return;
+    const storageKey = `${APP_CONFIG.STORAGE_KEYS.USER_SCOPED_PREFIX || 'pocketpe_user_'}${userId}_data`;
+    try {
+      const userData = {
+        wallets: this.state.wallets,
+        learnedMerchants: this.state.learnedMerchants,
+        transactions: this.state.transactions,
+        updatedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(storageKey, JSON.stringify(userData));
+    } catch (e) {
+      console.error('Failed to save user-scoped data:', e);
     }
   }
 

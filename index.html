@@ -56,8 +56,12 @@
           <span>✨</span> <span>Tour</span>
         </button>
 
-        <button class="desktop-btn" id="btn-desktop-tests" title="Run Unit Tests for Fraud Detection & Split Calculation">
+        <button class="desktop-btn" id="btn-desktop-tests" title="Run Unit Tests for Fraud Detection, Split Calculation & Supabase Auth">
           <span>🧪</span> <span>Run Tests</span>
+        </button>
+
+        <button class="desktop-btn" id="btn-desktop-auth" title="PocketPe Supabase Account">
+          <span>🔐</span> <span id="label-desktop-auth">Sign In</span>
         </button>
 
         <button class="desktop-btn" id="btn-desktop-reset" title="Reset to Initial Demo State">
@@ -344,6 +348,44 @@
               <div class="sheet-footer"></div>
             </div>
           </div>
+
+          <!-- Supabase Authentication Modal (Login / Sign Up) -->
+          <div class="modal-overlay" id="modal-auth" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="PocketPe Account">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">PocketPe Account</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-auth" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+            </div>
+          </div>
+
+          <!-- Supabase Configuration Modal -->
+          <div class="modal-overlay" id="modal-supabase-config" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Supabase Settings">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Supabase Settings</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-supabase-config" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Edit Profile Modal -->
+          <div class="modal-overlay" id="modal-edit-profile" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Edit Profile">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Edit Profile</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-edit-profile" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
         </div>
 
         <!-- 5-Section Bottom Navigation Bar -->
@@ -375,6 +417,9 @@
       </div>
     </main>
   </div>
+
+  <!-- Supabase JS Client (Vendor UMD) -->
+  <script src="./js/vendor/supabase.js"></script>
 
   <!-- Main JavaScript Bootstrap -->
   <script type="module" src="./js/app.js"></script>

@@ -19,6 +19,7 @@ export class HomeView {
 
     // Subscribe to state changes
     stateManager.subscribe('state:changed', () => this.render());
+    stateManager.subscribe('auth:changed', () => this.render());
     stateManager.subscribe('privacy:toggled', () => this.render());
     stateManager.subscribe('collect:updated', () => this.render());
     stateManager.subscribe('split:settled', () => this.render());
@@ -37,6 +38,13 @@ export class HomeView {
     const allocatedDisplay = isHidden ? '••••' : WalletEngine.formatRupee(summary.allocated);
     const freeDisplay = isHidden ? '••••' : WalletEngine.formatRupee(summary.free);
 
+    const initials = (state.user?.name || 'User')
+      .split(' ')
+      .filter(Boolean)
+      .map((p) => p[0].toUpperCase())
+      .slice(0, 2)
+      .join('') || 'U';
+
     // Pick top spending insight
     const topInsight = insights.length > 0
       ? insights[0]
@@ -45,10 +53,10 @@ export class HomeView {
     this.container.innerHTML = `
       <!-- Top Header -->
       <div class="home-header">
-        <div class="user-profile-badge">
-          <div class="avatar">SK</div>
+        <div class="user-profile-badge" id="btn-home-profile-badge" style="cursor: pointer;" title="Profile & Account">
+          <div class="avatar">${initials}</div>
           <div>
-            <div class="greeting-text">Good morning 👋</div>
+            <div class="greeting-text">${state.user?.greeting || 'Good day'} ${state.user?.isAuthenticated ? '●' : ''}</div>
             <div class="user-name">${state.user.name}</div>
           </div>
         </div>
@@ -220,6 +228,15 @@ export class HomeView {
   }
 
   static bindEvents() {
+    // Profile badge shortcut
+    const profileBadge = document.getElementById('btn-home-profile-badge');
+    if (profileBadge) {
+      profileBadge.addEventListener('click', () => {
+        NavigationManager.switchTab('profile');
+        SoundEngine.playTap();
+      });
+    }
+
     // Privacy toggle
     const privacyBtn = document.getElementById('btn-toggle-privacy');
     if (privacyBtn) {

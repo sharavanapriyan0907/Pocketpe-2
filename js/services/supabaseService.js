@@ -1,0 +1,264 @@
+/* ==========================================================================
+   POCKETPE - SUPABASE AUTHENTICATION SERVICE
+   Provides email/password authentication (Sign Up, Log In, Log Out, Profile)
+   and exposes authenticated Supabase user.id to the application.
+   ========================================================================== */
+
+import { APP_CONFIG } from '../config.js';
+
+class SupabaseService {
+  constructor() {
+    this.client = null;
+    this.url = localStorage.getItem(APP_CONFIG.STORAGE_KEYS.SUPABASE_URL) || APP_CONFIG.SUPABASE.DEFAULT_URL;
+    this.anonKey = localStorage.getItem(APP_CONFIG.STORAGE_KEYS.SUPABASE_ANON_KEY) || APP_CONFIG.SUPABASE.DEFAULT_ANON_KEY;
+    this.initialized = false;
+    this.authListeners = new Set();
+  }
+
+  /**
+   * Check whether real Supabase credentials are configured
+   */
+  isConfigured() {
+    if (!this.url || !this.anonKey) return false;
+    if (this.url.includes('xyzcompany') || this.url.includes('placeholder') || this.anonKey.includes('placeholder')) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Get current URL and Anon key
+   */
+  getConfig() {
+    return {
+      url: this.url,
+      anonKey: this.anonKey,
+      isConfigured: this.isConfigured(),
+    };
+  }
+
+  /**
+   * Update credentials at runtime and re-initialize client
+   */
+  async updateConfig(url, anonKey) {
+    this.url = (url || '').trim();
+    this.anonKey = (anonKey || '').trim();
+    localStorage.setItem(APP_CONFIG.STORAGE_KEYS.SUPABASE_URL, this.url);
+    localStorage.setItem(APP_CONFIG.STORAGE_KEYS.SUPABASE_ANON_KEY, this.anonKey);
+    this.initialized = false;
+    this.client = null;
+    return this.init();
+  }
+
+  /**
+   * Initialize Supabase client via window.supabase (vendor) or ESM CDN fallback
+   */
+  async init() {
+    if (this.initialized && this.client) return this.client;
+
+    let createClientFn = window.supabase?.createClient;
+
+    if (!createClientFn) {
+      try {
+        const mod = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+        createClientFn = mod.createClient;
+      } catch (err) {
+        console.warn('Could not load Supabase from ESM fallback:', err);
+      }
+    }
+
+    if (createClientFn && this.url && this.anonKey) {
+      try {
+        this.client = createClientFn(this.url, this.anonKey, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true,
+          },
+        });
+        this.initialized = true;
+
+        // Subscribe to auth state changes from Supabase
+        this.client.auth.onAuthStateChange((event, session) => {
+          this.notifyAuthListeners(event, session);
+        });
+
+        console.log('⚡ Supabase client initialized for:', this.url);
+      } catch (err) {
+        console.error('Failed to create Supabase client:', err);
+      }
+    }
+
+    return this.client;
+  }
+
+  /**
+   * Subscribe to Supabase auth events (SIGNED_IN, SIGNED_OUT, USER_UPDATED, etc.)
+   */
+  onAuthStateChange(callback) {
+    this.authListeners.add(callback);
+    return () => this.authListeners.delete(callback);
+  }
+
+  notifyAuthListeners(event, session) {
+    this.authListeners.forEach((cb) => {
+      try {
+        cb(event, session);
+      } catch (e) {
+        console.error('Error in Supabase auth listener:', e);
+      }
+    });
+  }
+
+  /**
+   * Email and password registration (Strictly non-anonymous)
+   */
+  async signUp(email, password, fullName) {
+    await this.init();
+    if (!this.client) {
+      throw new Error('Supabase client is not initialized. Please configure your Supabase Project URL and Anon Key.');
+    }
+
+    const trimmedEmail = (email || '').trim().toLowerCase();
+    const trimmedName = (fullName || '').trim();
+
+    if (!trimmedEmail || !trimmedEmail.includes('@')) {
+      throw new Error('Please enter a valid email address.');
+    }
+
+    if (!password || password.length < 6) {
+      throw new Error('Password must be at least 6 characters.');
+    }
+
+    const { data, error } = await this.client.auth.signUp({
+      email: trimmedEmail,
+      password: password,
+      options: {
+        data: {
+          full_name: trimmedName || trimmedEmail.split('@')[0],
+        },
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  }
+
+  /**
+   * Email and password sign in
+   */
+  async signIn(email, password) {
+    await this.init();
+    if (!this.client) {
+      throw new Error('Supabase client is not initialized. Please configure your Supabase Project URL and Anon Key.');
+    }
+
+    const trimmedEmail = (email || '').trim().toLowerCase();
+    if (!trimmedEmail) {
+      throw new Error('Please enter your email.');
+    }
+    if (!password) {
+      throw new Error('Please enter your password.');
+    }
+
+    const { data, error } = await this.client.auth.signInWithPassword({
+      email: trimmedEmail,
+      password: password,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  }
+
+  /**
+   * Sign out current user
+   */
+  async signOut() {
+    await this.init();
+    if (this.client) {
+      const { error } = await this.client.auth.signOut();
+      if (error) {
+        console.warn('Supabase sign out error:', error);
+      }
+    }
+  }
+
+  /**
+   * Get current active session
+   */
+  async getSession() {
+    await this.init();
+    if (!this.client) return null;
+    const { data, error } = await this.client.auth.getSession();
+    if (error) {
+      console.warn('Error fetching Supabase session:', error);
+      return null;
+    }
+    return data?.session || null;
+  }
+
+  /**
+   * Get current authenticated user
+   */
+  async getUser() {
+    await this.init();
+    if (!this.client) return null;
+    const { data, error } = await this.client.auth.getUser();
+    if (error) {
+      return null;
+    }
+    return data?.user || null;
+  }
+
+  /**
+   * Update profile metadata (e.g. full name)
+   */
+  async updateProfile({ fullName }) {
+    await this.init();
+    if (!this.client) {
+      throw new Error('Supabase client is not initialized.');
+    }
+
+    const trimmedName = (fullName || '').trim();
+    if (!trimmedName) {
+      throw new Error('Please enter a valid display name.');
+    }
+
+    const { data, error } = await this.client.auth.updateUser({
+      data: {
+        full_name: trimmedName,
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return data;
+  }
+
+  /**
+   * Test connection to Supabase endpoint
+   */
+  async testConnection() {
+    try {
+      await this.init();
+      if (!this.client) return { success: false, message: 'Client not initialized' };
+      const { data, error } = await this.client.auth.getSession();
+      if (error && !error.message.includes('Auth session missing')) {
+        return { success: false, message: error.message };
+      }
+      return { success: true, message: 'Connected successfully to Supabase' };
+    } catch (e) {
+      return { success: false, message: e.message || 'Connection failed' };
+    }
+  }
+}
+
+export const supabaseService = new SupabaseService();

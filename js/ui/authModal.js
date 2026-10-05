@@ -1,0 +1,318 @@
+/* ==========================================================================
+   POCKETPE - AUTHENTICATION MODAL (SUPABASE EMAIL/PASSWORD)
+   Supports Sign Up, Log In, Input Validation, and Supabase Auth Integration
+   ========================================================================== */
+
+import { supabaseService } from '../services/supabaseService.js';
+import { stateManager } from '../state.js';
+import { NavigationManager } from './navigation.js';
+import { SoundEngine } from './sound.js';
+
+export class AuthModal {
+  static init() {
+    this.modal = document.getElementById('modal-auth');
+    if (!this.modal) return;
+
+    this.currentTab = 'login'; // 'login' or 'signup'
+    this.render();
+  }
+
+  static open(tab = 'login') {
+    this.currentTab = tab;
+    this.render();
+    NavigationManager.openModal('modal-auth');
+  }
+
+  static render() {
+    if (!this.modal) return;
+
+    const body = this.modal.querySelector('.sheet-body');
+    const title = this.modal.querySelector('.sheet-title');
+    if (!body) return;
+
+    if (title) {
+      title.textContent = this.currentTab === 'login' ? 'Welcome Back' : 'Create Account';
+    }
+
+    const isConfigured = supabaseService.isConfigured();
+
+    body.innerHTML = `
+      <div style="text-align: center; margin-bottom: 16px;">
+        <div style="font-size: 2.2rem; margin-bottom: 6px;">
+          ${this.currentTab === 'login' ? '🔐' : '✨'}
+        </div>
+        <h3 class="h3" style="color: var(--text-primary); font-size: 1.15rem;">
+          ${this.currentTab === 'login' ? 'Sign In to PocketPe' : 'Join PocketPe'}
+        </h3>
+        <p class="subtitle" style="font-size: 0.8rem;">
+          ${this.currentTab === 'login'
+            ? 'Access your purpose wallets and merchant memories'
+            : 'Set up your student UPI profile with purpose wallets'}
+        </p>
+      </div>
+
+      <!-- Supabase Configuration Status Banner -->
+      ${!isConfigured ? `
+        <div class="card" style="padding: 10px 12px; background: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+          <div style="font-size: 0.76rem; color: var(--text-secondary);">
+            <strong style="color: #f59e0b;">⚙️ Setup Required:</strong> Connect your Supabase Project URL & Anon Key to authenticate.
+          </div>
+          <button class="btn btn-sm btn-ghost" id="btn-auth-open-config" style="white-space: nowrap; font-size: 0.72rem; padding: 4px 8px;">
+            Configure
+          </button>
+        </div>
+      ` : ''}
+
+      <!-- Tab Switcher (Log In / Sign Up) -->
+      <div style="display: flex; background: var(--bg-surface-secondary); padding: 4px; border-radius: var(--radius-md); margin-bottom: 16px;">
+        <button class="btn ${this.currentTab === 'login' ? 'btn-primary' : 'btn-ghost'}" id="tab-auth-login" style="flex: 1; padding: 8px; font-size: var(--text-xs);">
+          Log In
+        </button>
+        <button class="btn ${this.currentTab === 'signup' ? 'btn-primary' : 'btn-ghost'}" id="tab-auth-signup" style="flex: 1; padding: 8px; font-size: var(--text-xs);">
+          Sign Up
+        </button>
+      </div>
+
+      <!-- Error / Success Alert Box -->
+      <div id="auth-alert" style="display: none; padding: 10px 12px; border-radius: var(--radius-md); font-size: 0.78rem; margin-bottom: 14px; font-weight: 600;"></div>
+
+      <!-- Auth Form -->
+      <form id="form-auth" style="display: flex; flex-direction: column; gap: 12px;">
+        ${this.currentTab === 'signup' ? `
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="auth-name" style="font-size: var(--text-xs);">Full Name</label>
+            <input
+              type="text"
+              id="auth-name"
+              class="form-input"
+              placeholder="e.g. Sharath Kumar"
+              required
+              autocomplete="name"
+            />
+          </div>
+        ` : ''}
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="auth-email" style="font-size: var(--text-xs);">Email Address</label>
+          <input
+            type="email"
+            id="auth-email"
+            class="form-input"
+            placeholder="student@university.edu"
+            required
+            autocomplete="email"
+          />
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label" for="auth-password" style="font-size: var(--text-xs);">
+            Password ${this.currentTab === 'signup' ? '<span style="color: var(--text-muted); font-size: 0.7rem;">(min 6 characters)</span>' : ''}
+          </label>
+          <input
+            type="password"
+            id="auth-password"
+            class="form-input"
+            placeholder="••••••••"
+            required
+            autocomplete="${this.currentTab === 'login' ? 'current-password' : 'new-password'}"
+          />
+        </div>
+
+        ${this.currentTab === 'signup' ? `
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label" for="auth-confirm-password" style="font-size: var(--text-xs);">Confirm Password</label>
+            <input
+              type="password"
+              id="auth-confirm-password"
+              class="form-input"
+              placeholder="••••••••"
+              required
+              autocomplete="new-password"
+            />
+          </div>
+        ` : ''}
+
+        <button type="submit" class="btn btn-primary" id="btn-auth-submit" style="width: 100%; margin-top: 8px; padding: 12px;">
+          ${this.currentTab === 'login' ? 'Log In' : 'Create Account'}
+        </button>
+
+        <!-- Toggle Switch Link -->
+        <div style="text-align: center; margin-top: 8px; font-size: 0.78rem; color: var(--text-secondary);">
+          ${this.currentTab === 'login' ? `
+            Don't have an account?
+            <a href="#" id="link-switch-to-signup" style="color: var(--accent-primary); font-weight: 700; text-decoration: none;">Sign Up</a>
+          ` : `
+            Already have an account?
+            <a href="#" id="link-switch-to-login" style="color: var(--accent-primary); font-weight: 700; text-decoration: none;">Log In</a>
+          `}
+        </div>
+
+        <!-- Connection Settings Link -->
+        <div style="text-align: center; margin-top: 4px;">
+          <button type="button" id="btn-auth-settings-link" style="background: none; border: none; font-size: 0.72rem; color: var(--text-muted); cursor: pointer; text-decoration: underline;">
+            ⚙️ Supabase Connection Settings
+          </button>
+        </div>
+      </form>
+    `;
+
+    this.bindEvents();
+  }
+
+  static bindEvents() {
+    if (!this.modal) return;
+
+    // Tab buttons
+    const loginTabBtn = this.modal.querySelector('#tab-auth-login');
+    const signupTabBtn = this.modal.querySelector('#tab-auth-signup');
+    const switchToSignup = this.modal.querySelector('#link-switch-to-signup');
+    const switchToLogin = this.modal.querySelector('#link-switch-to-login');
+
+    const setTab = (tab) => {
+      this.currentTab = tab;
+      this.render();
+      SoundEngine.playTap();
+    };
+
+    if (loginTabBtn) loginTabBtn.addEventListener('click', () => setTab('login'));
+    if (signupTabBtn) signupTabBtn.addEventListener('click', () => setTab('signup'));
+    if (switchToSignup) switchToSignup.addEventListener('click', (e) => { e.preventDefault(); setTab('signup'); });
+    if (switchToLogin) switchToLogin.addEventListener('click', (e) => { e.preventDefault(); setTab('login'); });
+
+    // Open Config Modal
+    const configBtn = this.modal.querySelector('#btn-auth-open-config');
+    const settingsLink = this.modal.querySelector('#btn-auth-settings-link');
+    const openConfig = () => {
+      NavigationManager.closeModal('modal-auth');
+      NavigationManager.openModal('modal-supabase-config');
+    };
+    if (configBtn) configBtn.addEventListener('click', openConfig);
+    if (settingsLink) settingsLink.addEventListener('click', openConfig);
+
+    // Form submission
+    const form = this.modal.querySelector('#form-auth');
+    if (form) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await this.handleAuthSubmit();
+      });
+    }
+  }
+
+  static showAlert(message, type = 'error') {
+    const alertBox = this.modal.querySelector('#auth-alert');
+    if (!alertBox) return;
+
+    alertBox.style.display = 'block';
+    if (type === 'error') {
+      alertBox.style.background = 'rgba(239, 68, 68, 0.12)';
+      alertBox.style.border = '1px solid #ef4444';
+      alertBox.style.color = '#ef4444';
+    } else {
+      alertBox.style.background = 'rgba(16, 185, 129, 0.12)';
+      alertBox.style.border = '1px solid #10b981';
+      alertBox.style.color = '#10b981';
+    }
+    alertBox.textContent = message;
+  }
+
+  static hideAlert() {
+    const alertBox = this.modal.querySelector('#auth-alert');
+    if (alertBox) alertBox.style.display = 'none';
+  }
+
+  static async handleAuthSubmit() {
+    this.hideAlert();
+
+    const submitBtn = this.modal.querySelector('#btn-auth-submit');
+    const emailInput = this.modal.querySelector('#auth-email');
+    const passwordInput = this.modal.querySelector('#auth-password');
+    const nameInput = this.modal.querySelector('#auth-name');
+    const confirmPasswordInput = this.modal.querySelector('#auth-confirm-password');
+
+    const email = emailInput?.value?.trim() || '';
+    const password = passwordInput?.value || '';
+    const fullName = nameInput?.value?.trim() || '';
+    const confirmPassword = confirmPasswordInput?.value || '';
+
+    // Basic Validations
+    if (!email || !email.includes('@')) {
+      this.showAlert('Please enter a valid email address.');
+      return;
+    }
+
+    if (!password || password.length < 6) {
+      this.showAlert('Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (this.currentTab === 'signup') {
+      if (!fullName) {
+        this.showAlert('Please enter your full name.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        this.showAlert('Passwords do not match.');
+        return;
+      }
+    }
+
+    // Set Loading state
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = this.currentTab === 'login' ? 'Signing In...' : 'Creating Account...';
+    }
+
+    try {
+      if (this.currentTab === 'signup') {
+        const data = await supabaseService.signUp(email, password, fullName);
+        
+        if (data?.user) {
+          stateManager.setAuthUser(data.user);
+          SoundEngine.playSuccess();
+          NavigationManager.closeModal('modal-auth');
+          NavigationManager.showToast(`🎉 Welcome to PocketPe, ${fullName}!`, 'success');
+        } else {
+          // If Supabase has email confirmation enabled
+          this.showAlert('Confirmation email sent! Please check your inbox or verify in Supabase.', 'success');
+        }
+      } else {
+        const data = await supabaseService.signIn(email, password);
+
+        if (data?.user) {
+          stateManager.setAuthUser(data.user);
+          SoundEngine.playSuccess();
+          NavigationManager.closeModal('modal-auth');
+          const displayName = data.user.user_metadata?.full_name || email.split('@')[0];
+          NavigationManager.showToast(`✨ Welcome back, ${displayName}!`, 'success');
+        }
+      }
+    } catch (err) {
+      console.error('Authentication Error:', err);
+      SoundEngine.playAlert();
+      const friendlyMsg = this.formatAuthError(err.message || 'Authentication failed');
+      this.showAlert(friendlyMsg, 'error');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = this.currentTab === 'login' ? 'Log In' : 'Create Account';
+      }
+    }
+  }
+
+  static formatAuthError(msg) {
+    if (msg.includes('Invalid login credentials')) {
+      return 'Incorrect email or password. Please verify your credentials.';
+    }
+    if (msg.includes('User already registered')) {
+      return 'An account with this email already exists. Please log in instead.';
+    }
+    if (msg.includes('Password should be at least')) {
+      return 'Password must be at least 6 characters.';
+    }
+    if (msg.includes('Failed to fetch') || msg.includes('network')) {
+      return 'Could not reach Supabase endpoint. Please verify your Project URL in Connection Settings.';
+    }
+    return msg;
+  }
+}
