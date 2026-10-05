@@ -87,18 +87,37 @@ export class CategoryEngine {
       };
     }
 
-    // 2. Check Explicit Category (from UPI QR code MCC or user hint)
+    // 2. Check Explicit Category (from UPI QR code MCC, P2P friend auto-detection, or user hint)
     if (explicitCategory) {
       const targetWallet = this.findWalletByCategory(explicitCategory) || stateManager.getFreeMoneyWallet();
+      const isFriend = explicitCategory === 'Friends & Social' || explicitCategory.toLowerCase().includes('friend');
       return {
         merchantName: cleanName,
         category: explicitCategory,
         recommendedWallet: targetWallet,
         isLearned: false,
-        source: explicitMcc ? 'upi_mcc_code' : 'explicit_hint',
-        icon: targetWallet?.icon || '🏷️',
+        source: explicitMcc ? 'upi_mcc_code' : (isFriend ? 'p2p_friend_detection' : 'explicit_hint'),
+        icon: isFriend ? '🤝' : (targetWallet?.icon || '🏷️'),
         mcc: explicitMcc,
-        reason: explicitMcc ? `Auto-detected from UPI MCC #${explicitMcc} (${explicitCategory}).` : `Categorized as ${explicitCategory}.`,
+        reason: isFriend
+          ? `Auto-detected as Personal / Friend transfer (P2P). PocketPe selected ${targetWallet.name} wallet.`
+          : (explicitMcc ? `Auto-detected from UPI MCC #${explicitMcc} (${explicitCategory}).` : `Categorized as ${explicitCategory}.`),
+      };
+    }
+
+    // 2b. Check if merchantName is a personal UPI ID or mobile number (P2P Friend)
+    const isPersonalUpi = (cleanName.includes('@') || /^[6-9]\d{9}$/.test(cleanName.replace(/[\s\-+]/g, ''))) &&
+      !['swiggy', 'zomato', 'uber', 'ola', 'paytmwb', 'merchant', 'store', 'shop'].some((w) => lowerName.includes(w));
+    if (isPersonalUpi) {
+      const friendWallet = this.findWalletByCategory('Friends & Social') || stateManager.getFreeMoneyWallet();
+      return {
+        merchantName: cleanName,
+        category: 'Friends & Social',
+        recommendedWallet: friendWallet,
+        isLearned: false,
+        source: 'p2p_heuristic',
+        icon: '🤝',
+        reason: `Auto-detected as Personal / Friend transfer (${cleanName}). Recommended ${friendWallet.name} wallet.`,
       };
     }
 

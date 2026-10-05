@@ -45,9 +45,11 @@ export class PayView {
     stateManager.subscribe('fraud:reported', () => this.render());
     stateManager.subscribe('fraud:appealed', () => this.render());
 
-    // Lifecycle: Stop camera when leaving 'pay' tab
+    // Lifecycle: Stop camera when leaving 'pay' tab, auto-start camera on entering 'pay' tab
     stateManager.subscribe('tab:switched', (tabId) => {
-      if (tabId !== 'pay') {
+      if (tabId === 'pay') {
+        this.startCamera();
+      } else {
         this.stopCamera();
       }
     });
@@ -454,13 +456,23 @@ export class PayView {
     if (!detectedRaw && window.jsQR) {
       const canvas = document.getElementById('qr-scan-canvas') || document.createElement('canvas');
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
-      if (video.videoWidth > 0 && video.videoHeight > 0) {
-        canvas.width = Math.min(video.videoWidth, 800);
-        canvas.height = Math.min(video.videoHeight, 800 * (video.videoHeight / video.videoWidth));
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = window.jsQR(imgData.data, imgData.width, imgData.height, {
-          inversionAttempts: 'dontInvert',
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      if (vw > 0 && vh > 0) {
+        let targetW = vw;
+        let targetH = vh;
+        const maxDim = 960;
+        if (targetW > maxDim || targetH > maxDim) {
+          const ratio = Math.min(maxDim / targetW, maxDim / targetH);
+          targetW = Math.floor(targetW * ratio);
+          targetH = Math.floor(targetH * ratio);
+        }
+        canvas.width = targetW;
+        canvas.height = targetH;
+        ctx.drawImage(video, 0, 0, targetW, targetH);
+        const imgData = ctx.getImageData(0, 0, targetW, targetH);
+        const code = window.jsQR(imgData.data, targetW, targetH, {
+          inversionAttempts: 'attemptBoth',
         });
         if (code && code.data) {
           detectedRaw = code.data;
@@ -559,7 +571,9 @@ export class PayView {
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0);
           const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const res = window.jsQR(imgData.data, canvas.width, canvas.height);
+          const res = window.jsQR(imgData.data, canvas.width, canvas.height, {
+            inversionAttempts: 'attemptBoth',
+          });
           if (res && res.data) {
             detected = res.data;
           }
@@ -1012,11 +1026,13 @@ export class PayView {
     const initialName = prefill.merchantName || (prefill.upiId ? prefill.upiId : 'Blue Tokai Coffee');
     const initialCategory = prefill.category || 'General Expense';
 
+    const isFriend = initialCategory === 'Friends & Social' || prefill.icon === '🤝' || (prefill.upiId && !prefill.mcc);
+
     body.innerHTML = `
       <div style="text-align: center; margin-bottom: 8px;">
-        <span class="badge badge-accent">Pay Anyone</span>
-        <h3 class="h3" style="color: var(--text-primary); margin-top: 4px;">Custom Merchant or UPI</h3>
-        <p class="subtitle">Enter any merchant name, friend name, or paste a UPI ID / link.</p>
+        <span class="badge ${isFriend ? 'badge-accent' : 'badge-primary'}">${isFriend ? '🤝 Friend Transfer' : 'Pay Anyone'}</span>
+        <h3 class="h3" style="color: var(--text-primary); margin-top: 4px;">${isFriend ? `Pay ${initialName}` : 'Custom Merchant or UPI'}</h3>
+        <p class="subtitle">${isFriend ? 'Auto-detected as Personal / Friend Transfer (Friends Wallet)' : 'Enter any merchant name, friend name, or paste a UPI ID / link.'}</p>
       </div>
 
       <div class="form-group">

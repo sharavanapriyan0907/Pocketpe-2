@@ -519,6 +519,25 @@ export class UnitTests {
           (fuelClass.recommendedWallet.id === 'wallet_transport' || fuelClass.recommendedWallet.category === 'Transport & Fuel'),
         `Food wallet: ${foodClass.recommendedWallet?.id}, Fuel wallet: ${fuelClass.recommendedWallet?.id}`
       );
+    })();
+
+    // Test 21: Friend / P2P QR Code Auto-Detection (no MCC or mc=0000)
+    (() => {
+      const friendUri = 'UPI://PAY?PA=sneha.sharma%40okhdfcbank&PN=Sneha+Sharma&mc=0000';
+      const parsedFriend = UpiQrEngine.parse(friendUri);
+      const classified = CategoryEngine.classifyMerchant(parsedFriend.merchantName, 300, parsedFriend.category, parsedFriend.mcc);
+
+      assert(
+        'Friend QR Auto-Detection: Automatically detects personal P2P QR codes as Friends & Social and selects Friends wallet',
+        parsedFriend &&
+          parsedFriend.isP2p &&
+          parsedFriend.upiId === 'sneha.sharma@okhdfcbank' &&
+          parsedFriend.merchantName === 'Sneha Sharma' &&
+          parsedFriend.category === 'Friends & Social' &&
+          classified.recommendedWallet &&
+          (classified.recommendedWallet.id === 'wallet_friends' || classified.recommendedWallet.category === 'Friends & Social'),
+        `Parsed: ${parsedFriend?.merchantName} -> Wallet: ${classified.recommendedWallet?.id}`
+      );
 
       // Clean up and restore original user state so running tests does not disrupt user session
       if (originalUserState && originalUserState.isAuthenticated && originalUserState.supabaseUser) {

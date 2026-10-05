@@ -2,6 +2,7 @@
    POCKETPE - UPI QR CODE DECODER & PARSER ENGINE
    Parses standard Indian UPI QR specification (upi://pay?pa=...&pn=...)
    Extracts payee, merchant name, amount, MCC code, currency, and note.
+   Intelligently distinguishes commercial merchants (MCC) vs P2P Friends (no MCC / mc=0000).
    ========================================================================== */
 
 export const MCC_CATEGORY_MAP = {
@@ -65,18 +66,26 @@ export class UpiQrEngine {
 
     const trimmed = rawString.trim();
 
-    // 1. Standard UPI intent format: upi://pay?...
-    if (trimmed.toLowerCase().startsWith('upi://pay')) {
+    // 1. Standard UPI intent format: upi://pay?... (case-insensitive)
+    if (trimmed.toLowerCase().includes('upi://pay')) {
       return this.parseUpiUri(trimmed);
     }
 
-    // 2. BharatPe / PhonePe / Paytm web link formats
-    if (trimmed.includes('phonepe.com') || trimmed.includes('paytm.me') || trimmed.includes('bharatpe.com')) {
+    // 2. BharatPe / PhonePe / Paytm / GPay web link formats
+    if (
+      trimmed.includes('phonepe.com') ||
+      trimmed.includes('phon.pe') ||
+      trimmed.includes('paytm.me') ||
+      trimmed.includes('p-y.tm') ||
+      trimmed.includes('bharatpe.com') ||
+      trimmed.includes('gpay.app.goo.gl') ||
+      trimmed.includes('upiqr.in')
+    ) {
       return this.parseWebPaymentUrl(trimmed);
     }
 
     // 3. Plain UPI ID: username@bank
-    const upiRegex = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/;
+    const upiRegex = /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z0-9]{2,64}$/;
     if (upiRegex.test(trimmed)) {
       const username = trimmed.split('@')[0];
       const prettyName = username
@@ -86,34 +95,37 @@ export class UpiQrEngine {
       return {
         isValid: true,
         isUpiQr: true,
+        isP2p: true,
         upiId: trimmed,
         merchantName: prettyName,
         amount: null,
         mcc: null,
-        category: null,
-        icon: '🏷️',
+        category: 'Friends & Social', // Auto-detected as Friend / P2P
+        icon: '🤝',
         note: null,
         raw: trimmed,
       };
     }
 
-    // 4. Raw text merchant fallback
+    // 4. Raw text merchant or phone number fallback
+    const isPhoneNumber = /^[6-9]\d{9}$/.test(trimmed.replace(/[\s\-+]/g, ''));
     return {
       isValid: true,
       isUpiQr: false,
+      isP2p: isPhoneNumber,
       upiId: trimmed.includes('@') ? trimmed : `${trimmed.toLowerCase().replace(/[^a-z0-9]/g, '')}@upi`,
       merchantName: trimmed,
       amount: null,
       mcc: null,
-      category: null,
-      icon: '🏷️',
+      category: isPhoneNumber ? 'Friends & Social' : null,
+      icon: isPhoneNumber ? '🤝' : '🏷️',
       note: null,
       raw: trimmed,
     };
   }
 
   /**
-   * Parse standard upi://pay?pa=...&pn=... string
+   * Parse standard upi://pay?pa=...&pn=... string with case-insensitivity and P2P auto-detection
    */
   static parseUpiUri(uriString) {
     try {
@@ -125,39 +137,62 @@ export class UpiQrEngine {
       const queryString = uriString.substring(queryIdx + 1);
       const params = new URLSearchParams(queryString);
 
-      const pa = params.get('pa') || ''; // Payee UPI address (e.g. coffee@okaxis)
-      const pn = params.get('pn') || ''; // Payee Name (e.g. Chai Point)
-      const am = params.get('am') || null; // Amount (e.g. 150.00)
-      const mc = params.get('mc') || null; // Merchant Category Code (e.g. 5812)
-      const tn = params.get('tn') || ''; // Transaction note (e.g. Bill)
-      const cu = params.get('cu') || 'INR'; // Currency
+      // Case-insensitive query parameter extractor
+      const getParam = (name) => {
+        const lowerName = name.toLowerCase();
+        for (const [k, v] of params.entries()) {
+          if (k.toLowerCase() === lowerName) return v;
+        }
+        return null;
+      };
 
-      if (!pa) {
+      const rawPa = getParam('pa') || ''; // Payee UPI address (e.g. rohan@okaxis)
+      const rawPn = getParam('pn') || ''; // Payee Name (e.g. Rohan Sharma)
+      const rawAm = getParam('am'); // Amount (e.g. 150.00)
+      const rawMc = getParam('mc'); // Merchant Category Code (e.g. 5812 or 0000)
+      const rawTn = getParam('tn') || ''; // Transaction note (e.g. Bill)
+      const rawCu = getParam('cu') || 'INR'; // Currency
+
+      if (!rawPa) {
         return null;
       }
 
-      const decodedName = decodeURIComponent(pn || pa.split('@')[0]).trim();
-      const parsedAmount = am ? parseFloat(am) : null;
+      // Safely decode parameters (supporting %40 for @ and + for spaces)
+      const pa = decodeURIComponent(rawPa).trim();
+      const pn = rawPn ? decodeURIComponent(rawPn.replace(/\+/g, ' ')).trim() : '';
+      const decodedName = pn || pa.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const parsedAmount = rawAm ? parseFloat(rawAm) : null;
+      const cleanMc = rawMc ? rawMc.trim() : null;
 
-      // Map MCC code to category if present
+      // Intelligent P2P Friend Auto-Detection vs Merchant MCC:
+      // Personal / Friend QR codes in GPay, PhonePe, Paytm have no MCC or mc=0000.
+      const isP2p = !cleanMc || cleanMc === '0000' || cleanMc === '0';
+
       let mappedCategory = null;
       let mappedIcon = '🏷️';
-      if (mc && MCC_CATEGORY_MAP[mc]) {
-        mappedCategory = MCC_CATEGORY_MAP[mc].category;
-        mappedIcon = MCC_CATEGORY_MAP[mc].icon;
+
+      if (!isP2p && cleanMc && MCC_CATEGORY_MAP[cleanMc]) {
+        // Commercial merchant with registered MCC
+        mappedCategory = MCC_CATEGORY_MAP[cleanMc].category;
+        mappedIcon = MCC_CATEGORY_MAP[cleanMc].icon;
+      } else if (isP2p) {
+        // Peer-to-Peer Personal / Friend QR
+        mappedCategory = 'Friends & Social';
+        mappedIcon = '🤝';
       }
 
       return {
         isValid: true,
         isUpiQr: true,
-        upiId: pa.trim(),
-        merchantName: decodedName || pa.trim(),
+        isP2p,
+        upiId: pa,
+        merchantName: decodedName,
         amount: parsedAmount && !isNaN(parsedAmount) && parsedAmount > 0 ? parsedAmount : null,
-        mcc: mc ? mc.trim() : null,
+        mcc: cleanMc,
         category: mappedCategory,
         icon: mappedIcon,
-        currency: cu,
-        note: decodeURIComponent(tn).trim(),
+        currency: rawCu,
+        note: rawTn ? decodeURIComponent(rawTn.replace(/\+/g, ' ')).trim() : '',
         raw: uriString,
       };
     } catch (e) {
@@ -172,10 +207,10 @@ export class UpiQrEngine {
   static parseWebPaymentUrl(urlString) {
     try {
       const url = new URL(urlString);
-      const pa = url.searchParams.get('pa');
-      const pn = url.searchParams.get('pn');
-      const am = url.searchParams.get('am');
-      const mc = url.searchParams.get('mc');
+      const pa = url.searchParams.get('pa') || url.searchParams.get('PA');
+      const pn = url.searchParams.get('pn') || url.searchParams.get('PN');
+      const am = url.searchParams.get('am') || url.searchParams.get('AM');
+      const mc = url.searchParams.get('mc') || url.searchParams.get('MC');
 
       if (pa) {
         return this.parseUpiUri(`upi://pay?${url.searchParams.toString()}`);
@@ -185,6 +220,7 @@ export class UpiQrEngine {
       return {
         isValid: true,
         isUpiQr: false,
+        isP2p: false,
         upiId: `merchant@${url.hostname.replace(/[^a-z0-9]/g, '')}`,
         merchantName: url.hostname.replace('www.', ''),
         amount: am ? parseFloat(am) : null,
