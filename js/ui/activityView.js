@@ -76,23 +76,24 @@ export class ActivityView {
         <span class="badge badge-accent">${filtered.length} Records</span>
       </div>
 
-      <!-- Search Input -->
-      <div class="form-group">
-        <input
-          type="text"
-          class="input-text"
-          id="activity-search-input"
-          placeholder="🔍 Search merchant, category, or note..."
-          value="${this.searchQuery}"
-        />
-      </div>
+      <!-- Search & Filter Controls Bar -->
+      <div class="activity-filter-bar">
+        <div class="form-group" style="margin-bottom: 0; flex: 1;">
+          <input
+            type="text"
+            class="input-text"
+            id="activity-search-input"
+            placeholder="🔍 Search merchant, category, or note..."
+            value="${this.searchQuery}"
+          />
+        </div>
 
-      <!-- Filter Pills -->
-      <div class="filter-scroll-row">
-        <button class="filter-chip ${this.filterType === 'all' ? 'active' : ''}" data-act-filter="all">All</button>
-        <button class="filter-chip ${this.filterType === 'debit' ? 'active' : ''}" data-act-filter="debit">Payments</button>
-        <button class="filter-chip ${this.filterType === 'credit' ? 'active' : ''}" data-act-filter="credit">Money Received</button>
-        <button class="filter-chip ${this.filterType === 'rebalance' ? 'active' : ''}" data-act-filter="rebalance">Rebalanced</button>
+        <div class="filter-scroll-row" style="margin-bottom: 0;">
+          <button class="filter-chip ${this.filterType === 'all' ? 'active' : ''}" data-act-filter="all">All</button>
+          <button class="filter-chip ${this.filterType === 'debit' ? 'active' : ''}" data-act-filter="debit">Payments</button>
+          <button class="filter-chip ${this.filterType === 'credit' ? 'active' : ''}" data-act-filter="credit">Money Received</button>
+          <button class="filter-chip ${this.filterType === 'rebalance' ? 'active' : ''}" data-act-filter="rebalance">Rebalanced</button>
+        </div>
       </div>
 
       <!-- Timeline List -->

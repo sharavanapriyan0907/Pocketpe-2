@@ -158,17 +158,17 @@ class App {
   }
 
   static setupDesktopControls() {
-    // Phone Frame / Fullscreen toggle
+    // Phone Simulator vs Laptop View toggle
     const toggleFrameBtn = document.getElementById('btn-toggle-device-frame');
     const phoneWrapper = document.querySelector('.phone-wrapper');
     if (toggleFrameBtn && phoneWrapper) {
       toggleFrameBtn.addEventListener('click', () => {
-        phoneWrapper.classList.toggle('fullscreen-mode');
-        const isFull = phoneWrapper.classList.contains('fullscreen-mode');
-        toggleFrameBtn.classList.toggle('active', isFull);
-        toggleFrameBtn.innerHTML = isFull
-          ? '<span>📱</span> <span>Phone Mode</span>'
-          : '<span>🖥️</span> <span>Expand View</span>';
+        phoneWrapper.classList.toggle('simulator-mode');
+        const isSimulator = phoneWrapper.classList.contains('simulator-mode');
+        toggleFrameBtn.classList.toggle('active', isSimulator);
+        toggleFrameBtn.innerHTML = isSimulator
+          ? '<span>💻</span> <span>Laptop View</span>'
+          : '<span>📱</span> <span>Phone Simulator</span>';
         SoundEngine.playTap();
       });
     }

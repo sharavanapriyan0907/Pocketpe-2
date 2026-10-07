@@ -7,7 +7,7 @@
 
 import { FraudEngine, RISK_LEVELS } from '../engines/fraudEngine.js';
 import { SplitEngine } from '../engines/splitEngine.js';
-import { UpiQrEngine, parseUpiQr, getCategoryFromMcc, getWalletForCategory } from '../engines/upiQrEngine.js';
+import { UpiQrEngine, parseUpiQr, getCategoryFromMcc, getPocketPeCategory, getWalletForCategory } from '../engines/upiQrEngine.js';
 import { CategoryEngine } from '../engines/categoryEngine.js';
 import { supabaseService } from '../services/supabaseService.js';
 import { stateManager } from '../state.js';
@@ -537,9 +537,9 @@ export class UnitTests {
       assert(
         'parseUpiQr: Rejects non-UPI & malformed QR codes with error message without crashing',
         nonUpi1.isUpi === false &&
-          nonUpi1.error === "This QR doesn't appear to be a UPI payment QR." &&
+          nonUpi1.error === 'This QR is not a supported UPI payment QR.' &&
           nonUpi2.isUpi === false &&
-          nonUpi2.error === "This QR doesn't appear to be a UPI payment QR." &&
+          nonUpi2.error === 'This QR is not a supported UPI payment QR.' &&
           nonUpi3.isUpi === false &&
           nonUpi4.isUpi === false &&
           nonUpi5.isUpi === false,
@@ -547,30 +547,49 @@ export class UnitTests {
       );
     })();
 
-    // Test 22: getCategoryFromMcc - Centralized Category Mapping
+    // Test 22: getCategoryFromMcc & getPocketPeCategory - Centralized Category Mapping
     (() => {
-      const m5912 = getCategoryFromMcc('5912'); // Medical
-      const m5812 = getCategoryFromMcc('5812'); // Food
-      const m5814 = getCategoryFromMcc('5814'); // Food
+      const m5912 = getCategoryFromMcc('5912'); // Medical / Pharmacy
+      const m5812 = getCategoryFromMcc('5812'); // Restaurant
+      const m5814 = getCategoryFromMcc('5814'); // Fast Food
       const m5411 = getCategoryFromMcc('5411'); // Grocery
-      const m7230 = getCategoryFromMcc('7230'); // Personal Care
-      const m4121 = getCategoryFromMcc('4121'); // Transportation
+      const m7230 = getCategoryFromMcc('7230'); // Salon / Barber
+      const m4121 = getCategoryFromMcc('4121'); // Transportation / Taxi
       const m5541 = getCategoryFromMcc('5541'); // Fuel
       const m4900 = getCategoryFromMcc('4900'); // Utilities
       const m8220 = getCategoryFromMcc('8220'); // Education
 
+      const p5912 = getPocketPeCategory(m5912); // Medical
+      const p5812 = getPocketPeCategory(m5812); // Food
+      const p5814 = getPocketPeCategory(m5814); // Food
+      const p5411 = getPocketPeCategory(m5411); // Grocery
+      const p7230 = getPocketPeCategory(m7230); // Personal Care
+      const p4121 = getPocketPeCategory(m4121); // Transportation
+      const p5541 = getPocketPeCategory(m5541); // Fuel
+      const p4900 = getPocketPeCategory(m4900); // Utilities
+      const p8220 = getPocketPeCategory(m8220); // Education
+
       assert(
-        'getCategoryFromMcc: Centralized mapping maps MCC codes to standard categories',
-        m5912 === 'Medical' &&
-          m5812 === 'Food' &&
-          m5814 === 'Food' &&
+        'getCategoryFromMcc: Centralized mapping maps MCC codes to standard categories and PocketPe categories',
+        m5912 === 'Medical / Pharmacy' &&
+          m5812 === 'Restaurant' &&
+          m5814 === 'Fast Food' &&
           m5411 === 'Grocery' &&
-          m7230 === 'Personal Care' &&
-          m4121 === 'Transportation' &&
+          m7230 === 'Salon / Barber' &&
+          m4121 === 'Transportation / Taxi' &&
           m5541 === 'Fuel' &&
           m4900 === 'Utilities' &&
-          m8220 === 'Education',
-        `Mappings: 5912->${m5912}, 5812->${m5812}, 5541->${m5541}, 8220->${m8220}`
+          m8220 === 'Education' &&
+          p5912 === 'Medical' &&
+          p5812 === 'Food' &&
+          p5814 === 'Food' &&
+          p5411 === 'Grocery' &&
+          p7230 === 'Personal Care' &&
+          p4121 === 'Transportation' &&
+          p5541 === 'Fuel' &&
+          p4900 === 'Utilities' &&
+          p8220 === 'Education',
+        `Mappings: 5912->${m5912}->${p5912}, 5812->${m5812}->${p5812}, 5541->${m5541}->${p5541}`
       );
     })();
 

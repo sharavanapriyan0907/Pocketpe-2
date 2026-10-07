@@ -34,9 +34,33 @@
         </div>
       </div>
 
+      <!-- Desktop Primary Navigation Bar -->
+      <nav class="desktop-nav-bar" aria-label="Desktop Navigation">
+        <button class="desktop-nav-item active" data-nav-target="home">
+          <span class="desktop-nav-icon">🏠</span>
+          <span>Home</span>
+        </button>
+        <button class="desktop-nav-item" data-nav-target="wallets">
+          <span class="desktop-nav-icon">💼</span>
+          <span>Wallets</span>
+        </button>
+        <button class="desktop-nav-item desktop-nav-pay" data-nav-target="pay">
+          <span class="desktop-nav-icon">⚡</span>
+          <span>Scan & Pay</span>
+        </button>
+        <button class="desktop-nav-item" data-nav-target="activity">
+          <span class="desktop-nav-icon">📋</span>
+          <span>Activity</span>
+        </button>
+        <button class="desktop-nav-item" data-nav-target="profile">
+          <span class="desktop-nav-icon">⚙️</span>
+          <span>Settings</span>
+        </button>
+      </nav>
+
       <div class="desktop-controls">
-        <button class="desktop-btn" id="btn-toggle-device-frame" title="Toggle Phone Chassis vs Expanded Desktop View">
-          <span>🖥️</span> <span>Expand View</span>
+        <button class="desktop-btn" id="btn-toggle-device-frame" title="Toggle Phone Simulator vs Laptop View">
+          <span>📱</span> <span>Phone Simulator</span>
         </button>
 
         <button class="desktop-btn" id="btn-desktop-theme-toggle" title="Toggle Light/Dark Theme">
@@ -417,6 +441,9 @@
       </div>
     </main>
   </div>
+
+  <!-- Runtime Environment Configuration (.env / window.__ENV__) -->
+  <script src="./env.js"></script>
 
   <!-- Supabase JS Client (Vendor UMD) -->
   <script src="./js/vendor/supabase.js"></script>

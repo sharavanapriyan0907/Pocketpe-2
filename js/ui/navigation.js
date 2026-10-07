@@ -49,11 +49,12 @@ export class NavigationManager {
       }
     });
 
-    // Scroll phone screen container to top
+    // Scroll container to top
     const phoneScreen = document.querySelector('.phone-screen');
     if (phoneScreen) {
       phoneScreen.scrollTo({ top: 0, behavior: 'smooth' });
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
     stateManager.notify('tab:switched', tabId);
   }

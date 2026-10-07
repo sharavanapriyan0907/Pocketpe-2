@@ -19,9 +19,9 @@ export const APP_CONFIG = {
   DEFAULT_ACCENT: 'blue',
   DEFAULT_THEME: 'system',
   SUPABASE: {
-    // Default / placeholder credentials (can be overridden via localStorage or in-app settings)
-    DEFAULT_URL: 'https://xyzcompany.supabase.co',
-    DEFAULT_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.placeholder',
+    // Default project credentials (can be overridden via .env, window.__ENV__, localStorage, or in-app settings)
+    DEFAULT_URL: (typeof window !== 'undefined' && window.__ENV__?.SUPABASE_URL) || 'https://gevjalpbbqesuggnllsx.supabase.co',
+    DEFAULT_ANON_KEY: (typeof window !== 'undefined' && (window.__ENV__?.SUPABASE_ANON_KEY || window.__ENV__?.SUPABASE_PUBLISHABLE_KEY)) || 'sb_publishable_JSsZMAf2wmDSIIu2zEeKAQ_0YDE2i_w',
   },
 };
 
@@ -105,14 +105,27 @@ export const INITIAL_WALLETS = [
     frequency: 'Every time I receive money',
   },
   {
+    id: 'wallet_medical',
+    name: 'Medical',
+    icon: '💊',
+    color: '#ef4444',
+    balance: 1500,
+    targetAmount: 2000,
+    monthlyLimit: 2000,
+    allocationPercentage: 10,
+    category: 'Medical',
+    isFreeMoney: false,
+    frequency: 'Every time I receive money',
+  },
+  {
     id: 'wallet_free',
     name: 'Free Money',
     icon: '✨',
     color: '#3b82f6',
-    balance: 2200,
+    balance: 1200,
     targetAmount: 0,
     monthlyLimit: 0,
-    allocationPercentage: 20,
+    allocationPercentage: 10,
     category: 'Unallocated Cushion',
     isFreeMoney: true,
     frequency: 'Unallocated reserve',

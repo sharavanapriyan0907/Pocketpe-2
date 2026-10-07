@@ -7,56 +7,56 @@
 
 /**
  * Centralized MCC Category Mapping Table
- * Maps standardized 4-digit Merchant Category Codes to PocketPe spending categories.
+ * Maps standardized 4-digit Merchant Category Codes to Merchant Categories and PocketPe categories.
  */
 export const MCC_CATEGORY_MAP = {
-  // Medical / Health
-  '5912': { category: 'Medical', label: 'Pharmacies & Drug Stores', icon: '💊' },
-  '8011': { category: 'Medical', label: 'Doctors & Physicians', icon: '🩺' },
-  '8021': { category: 'Medical', label: 'Dentists', icon: '🦷' },
-  '8062': { category: 'Medical', label: 'Hospitals', icon: '🏥' },
+  // 5912 → Medical / Pharmacy
+  '5912': { merchantCategory: 'Medical / Pharmacy', category: 'Medical', label: 'Pharmacies & Drug Stores', icon: '💊' },
+  '8011': { merchantCategory: 'Medical / Pharmacy', category: 'Medical', label: 'Doctors & Physicians', icon: '🩺' },
+  '8021': { merchantCategory: 'Medical / Pharmacy', category: 'Medical', label: 'Dentists', icon: '🦷' },
+  '8062': { merchantCategory: 'Medical / Pharmacy', category: 'Medical', label: 'Hospitals', icon: '🏥' },
 
-  // Food & Dining / Grocery
-  '5812': { category: 'Food', label: 'Restaurants & Eating Places', icon: '🍔' },
-  '5814': { category: 'Food', label: 'Fast Food Restaurants', icon: '🍕' },
-  '5411': { category: 'Grocery', label: 'Grocery Stores / Supermarkets', icon: '🛒' },
-  '5462': { category: 'Food', label: 'Bakeries', icon: '🥖' },
-  '5499': { category: 'Grocery', label: 'Misc Food & Convenience Stores', icon: '🏪' },
-  '5811': { category: 'Food', label: 'Caterers', icon: '🍱' },
-  '5813': { category: 'Food', label: 'Drinking Places / Bars', icon: '🍻' },
+  // 5812 → Restaurant, 5814 → Fast Food, 5411 → Grocery
+  '5812': { merchantCategory: 'Restaurant', category: 'Food', label: 'Restaurants & Dining', icon: '🍔' },
+  '5814': { merchantCategory: 'Fast Food', category: 'Food', label: 'Fast Food Restaurants', icon: '🍕' },
+  '5411': { merchantCategory: 'Grocery', category: 'Grocery', label: 'Grocery Stores / Supermarkets', icon: '🛒' },
+  '5462': { merchantCategory: 'Restaurant', category: 'Food', label: 'Bakeries', icon: '🥖' },
+  '5499': { merchantCategory: 'Grocery', category: 'Grocery', label: 'Misc Food & Convenience Stores', icon: '🏪' },
+  '5811': { merchantCategory: 'Restaurant', category: 'Food', label: 'Caterers', icon: '🍱' },
+  '5813': { merchantCategory: 'Restaurant', category: 'Food', label: 'Drinking Places / Bars', icon: '🍻' },
 
-  // Transport & Fuel
-  '4121': { category: 'Transportation', label: 'Taxi & Rideshare', icon: '🚕' },
-  '4111': { category: 'Transportation', label: 'Commuter Transport & Metro', icon: '🚆' },
-  '4131': { category: 'Transportation', label: 'Bus Lines', icon: '🚌' },
-  '4789': { category: 'Transportation', label: 'Transportation Services', icon: '🚗' },
-  '5541': { category: 'Fuel', label: 'Service Stations / Petrol', icon: '⛽' },
-  '5542': { category: 'Fuel', label: 'Automated Fuel Dispensers', icon: '⛽' },
+  // 4121 → Transportation / Taxi, 5541 → Fuel
+  '4121': { merchantCategory: 'Transportation / Taxi', category: 'Transportation', label: 'Taxi & Rideshare', icon: '🚕' },
+  '4111': { merchantCategory: 'Transportation / Taxi', category: 'Transportation', label: 'Commuter Transport & Metro', icon: '🚆' },
+  '4131': { merchantCategory: 'Transportation / Taxi', category: 'Transportation', label: 'Bus Lines', icon: '🚌' },
+  '4789': { merchantCategory: 'Transportation / Taxi', category: 'Transportation', label: 'Transportation Services', icon: '🚗' },
+  '5541': { merchantCategory: 'Fuel', category: 'Fuel', label: 'Service Stations / Petrol', icon: '⛽' },
+  '5542': { merchantCategory: 'Fuel', category: 'Fuel', label: 'Automated Fuel Dispensers', icon: '⛽' },
 
-  // Education
-  '8220': { category: 'Education', label: 'Colleges & Universities', icon: '🎓' },
-  '8211': { category: 'Education', label: 'Elementary & Secondary Schools', icon: '🏫' },
-  '8299': { category: 'Education', label: 'Educational Services & Courses', icon: '📚' },
-  '5942': { category: 'Education', label: 'Book Stores', icon: '📖' },
-  '5943': { category: 'Education', label: 'Stationery Stores', icon: '✏️' },
+  // 8220 → Education
+  '8220': { merchantCategory: 'Education', category: 'Education', label: 'Colleges & Universities', icon: '🎓' },
+  '8211': { merchantCategory: 'Education', category: 'Education', label: 'Elementary & Secondary Schools', icon: '🏫' },
+  '8299': { merchantCategory: 'Education', category: 'Education', label: 'Educational Services & Courses', icon: '📚' },
+  '5942': { merchantCategory: 'Education', category: 'Education', label: 'Book Stores', icon: '📖' },
+  '5943': { merchantCategory: 'Education', category: 'Education', label: 'Stationery Stores', icon: '✏️' },
 
-  // Personal Care
-  '7230': { category: 'Personal Care', label: 'Salon & Barber', icon: '💈' },
-  '7298': { category: 'Personal Care', label: 'Health & Beauty Spas', icon: '🧖' },
+  // 7230 → Salon / Barber
+  '7230': { merchantCategory: 'Salon / Barber', category: 'Personal Care', label: 'Salon & Barber', icon: '💈' },
+  '7298': { merchantCategory: 'Salon / Barber', category: 'Personal Care', label: 'Health & Beauty Spas', icon: '🧖' },
 
-  // Utilities & Housing
-  '4900': { category: 'Utilities', label: 'Utilities (Electric, Gas, Water)', icon: '💡' },
-  '4899': { category: 'Utilities', label: 'Cable & Internet Services', icon: '📡' },
+  // 4900 → Utilities
+  '4900': { merchantCategory: 'Utilities', category: 'Utilities', label: 'Utilities (Electric, Gas, Water)', icon: '💡' },
+  '4899': { merchantCategory: 'Utilities', category: 'Utilities', label: 'Cable & Internet Services', icon: '📡' },
 
   // Shopping & Apparel
-  '5311': { category: 'Shopping', label: 'Department Stores', icon: '🏬' },
-  '5651': { category: 'Shopping', label: 'Family Clothing Stores', icon: '👕' },
-  '5661': { category: 'Shopping', label: 'Shoe Stores', icon: '👟' },
-  '5944': { category: 'Shopping', label: 'Jewelry Stores', icon: '💍' },
+  '5311': { merchantCategory: 'Shopping', category: 'Shopping', label: 'Department Stores', icon: '🏬' },
+  '5651': { merchantCategory: 'Shopping', category: 'Shopping', label: 'Family Clothing Stores', icon: '👕' },
+  '5661': { merchantCategory: 'Shopping', category: 'Shopping', label: 'Shoe Stores', icon: '👟' },
+  '5944': { merchantCategory: 'Shopping', category: 'Shopping', label: 'Jewelry Stores', icon: '💍' },
 
   // Entertainment
-  '7832': { category: 'Entertainment', label: 'Motion Picture Theaters / Cinema', icon: '🎬' },
-  '7999': { category: 'Entertainment', label: 'Recreation & Gaming Services', icon: '🎮' },
+  '7832': { merchantCategory: 'Entertainment', category: 'Entertainment', label: 'Motion Picture Theaters / Cinema', icon: '🎬' },
+  '7999': { merchantCategory: 'Entertainment', category: 'Entertainment', label: 'Recreation & Gaming Services', icon: '🎮' },
 };
 
 /**
@@ -64,17 +64,20 @@ export const MCC_CATEGORY_MAP = {
  * Safely decodes upi://pay?... payloads into parameter map.
  * Extracts: pa, pn, mc, am, cu, tn, tr, mid, msid, mtid.
  * Only stores fields that actually exist.
- * Returns { isUpi: false, error: "This QR doesn't appear to be a UPI payment QR." } on non-UPI QR.
+ * Returns { isUpi: false, error: "This QR is not a supported UPI payment QR." } on non-UPI QR.
  *
  * @param {string} rawQrData
  * @returns {Object}
  */
 export function parseUpiQr(rawQrData) {
+  const notSupportedResult = {
+    isUpi: false,
+    error: 'This QR is not a supported UPI payment QR.',
+    raw: rawQrData,
+  };
+
   if (!rawQrData || typeof rawQrData !== 'string') {
-    return {
-      isUpi: false,
-      error: "This QR doesn't appear to be a UPI payment QR.",
-    };
+    return notSupportedResult;
   }
 
   const trimmed = rawQrData.trim();
@@ -82,21 +85,13 @@ export function parseUpiQr(rawQrData) {
 
   // Check if string contains UPI intent protocol
   if (!lower.startsWith('upi://pay')) {
-    return {
-      isUpi: false,
-      error: "This QR doesn't appear to be a UPI payment QR.",
-      raw: rawQrData,
-    };
+    return notSupportedResult;
   }
 
   try {
     const qIdx = trimmed.indexOf('?');
     if (qIdx === -1) {
-      return {
-        isUpi: false,
-        error: "This QR doesn't appear to be a UPI payment QR.",
-        raw: rawQrData,
-      };
+      return notSupportedResult;
     }
 
     const queryString = trimmed.substring(qIdx + 1);
@@ -126,20 +121,12 @@ export function parseUpiQr(rawQrData) {
 
     const rawPa = getParam('pa');
     if (!rawPa) {
-      return {
-        isUpi: false,
-        error: "This QR doesn't appear to be a UPI payment QR.",
-        raw: rawQrData,
-      };
+      return notSupportedResult;
     }
 
     const pa = decodeVal(rawPa, false);
     if (!pa) {
-      return {
-        isUpi: false,
-        error: "This QR doesn't appear to be a UPI payment QR.",
-        raw: rawQrData,
-      };
+      return notSupportedResult;
     }
 
     const result = {
@@ -184,18 +171,14 @@ export function parseUpiQr(rawQrData) {
 
     return result;
   } catch (err) {
-    return {
-      isUpi: false,
-      error: "This QR doesn't appear to be a UPI payment QR.",
-      raw: rawQrData,
-    };
+    return notSupportedResult;
   }
 }
 
 /**
  * STEP 3: Centralized MCC Category Mapping Function
- * Maps MCC code to high-level spending category.
- * If MCC is missing, null, empty, "0000", or unknown: returns null.
+ * Maps MCC code to Merchant Category (e.g. 5912 → Medical / Pharmacy).
+ * If MCC is missing, null, empty, "0000", "0", or unknown: returns null.
  * Does NOT guess category from merchant name.
  *
  * @param {string|number|null} mcc
@@ -209,7 +192,33 @@ export function getCategoryFromMcc(mcc) {
   }
 
   const match = MCC_CATEGORY_MAP[cleanMcc];
-  return match ? match.category : null;
+  if (!match) return null;
+  return match.merchantCategory || match.category || null;
+}
+
+/**
+ * Map Merchant Category (e.g. "Medical / Pharmacy") to PocketPe Category ("Medical")
+ * @param {string} merchantCategory
+ * @returns {string}
+ */
+export function getPocketPeCategory(merchantCategory) {
+  if (!merchantCategory) return 'General';
+  const clean = merchantCategory.trim();
+  const map = {
+    'Medical / Pharmacy': 'Medical',
+    'Medical': 'Medical',
+    'Restaurant': 'Food',
+    'Fast Food': 'Food',
+    'Grocery': 'Grocery',
+    'Salon / Barber': 'Personal Care',
+    'Transportation / Taxi': 'Transportation',
+    'Fuel': 'Fuel',
+    'Utilities': 'Utilities',
+    'Education': 'Education',
+    'Shopping': 'Shopping',
+    'Entertainment': 'Entertainment',
+  };
+  return map[clean] || clean;
 }
 
 /**

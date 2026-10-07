@@ -7,7 +7,8 @@
   display: none;
   flex-direction: column;
   gap: 20px;
-  padding: 16px 20px 24px;
+  padding: 0;
+  width: 100%;
   animation: fadeIn 0.25s ease-out;
 }
 
@@ -1225,3 +1226,85 @@
   width: 22px;
   background: var(--accent-primary);
 }
+
+/* ==========================================================================
+   RESPONSIVE LAYOUT CONTAINERS (Mobile Defaults)
+   ========================================================================== */
+.pay-responsive-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile-responsive-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.activity-filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ==========================================================================
+   LAPTOP / DESKTOP RESPONSIVE LAYOUTS (Screens >= 769px)
+   ========================================================================== */
+@media (min-width: 769px) {
+  /* Quick Actions in 6-column single sleek row on laptop */
+  .quick-actions-grid {
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 14px;
+  }
+
+  .action-tile {
+    padding: 16px 10px;
+  }
+
+  /* Wallets in responsive multi-column grid */
+  .wallets-list {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+    gap: 16px !important;
+  }
+
+  /* Balance Hero Card spacious padding */
+  .balance-hero-card {
+    padding: 26px 30px;
+    border-radius: var(--radius-2xl);
+  }
+
+  .balance-amount-display .amount {
+    font-size: 2.75rem;
+  }
+
+  /* Scan & Pay 2-Column Responsive Layout */
+  .pay-responsive-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  .scanner-viewfinder {
+    height: 340px;
+  }
+
+  /* Profile & Settings 2-Column Responsive Layout */
+  .profile-responsive-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 22px;
+    align-items: start;
+  }
+
+  /* Activity Search & Filter Bar Layout */
+  .activity-filter-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+  }
+}
+

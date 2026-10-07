@@ -80,13 +80,14 @@ export class AuthModal {
       <form id="form-auth" style="display: flex; flex-direction: column; gap: 12px;">
         ${this.currentTab === 'signup' ? `
           <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label" for="auth-name" style="font-size: var(--text-xs);">Full Name</label>
+            <label class="form-label" for="auth-name" style="font-size: var(--text-xs);">
+              Full Name <span style="color: var(--text-muted); font-size: 0.7rem;">(Optional)</span>
+            </label>
             <input
               type="text"
               id="auth-name"
               class="form-input"
               placeholder="e.g. Sharath Kumar"
-              required
               autocomplete="name"
             />
           </div>
@@ -117,20 +118,6 @@ export class AuthModal {
             autocomplete="${this.currentTab === 'login' ? 'current-password' : 'new-password'}"
           />
         </div>
-
-        ${this.currentTab === 'signup' ? `
-          <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label" for="auth-confirm-password" style="font-size: var(--text-xs);">Confirm Password</label>
-            <input
-              type="password"
-              id="auth-confirm-password"
-              class="form-input"
-              placeholder="••••••••"
-              required
-              autocomplete="new-password"
-            />
-          </div>
-        ` : ''}
 
         <button type="submit" class="btn btn-primary" id="btn-auth-submit" style="width: 100%; margin-top: 8px; padding: 12px;">
           ${this.currentTab === 'login' ? 'Log In' : 'Create Account'}
@@ -221,60 +208,58 @@ export class AuthModal {
     if (alertBox) alertBox.style.display = 'none';
   }
 
+  static isSubmitting = false;
+
   static async handleAuthSubmit() {
+    if (this.isSubmitting) return; // Prevent duplicate submissions
+
     this.hideAlert();
 
     const submitBtn = this.modal.querySelector('#btn-auth-submit');
     const emailInput = this.modal.querySelector('#auth-email');
     const passwordInput = this.modal.querySelector('#auth-password');
     const nameInput = this.modal.querySelector('#auth-name');
-    const confirmPasswordInput = this.modal.querySelector('#auth-confirm-password');
 
     const email = emailInput?.value?.trim() || '';
     const password = passwordInput?.value || '';
     const fullName = nameInput?.value?.trim() || '';
-    const confirmPassword = confirmPasswordInput?.value || '';
 
     // Basic Validations
-    if (!email || !email.includes('@')) {
-      this.showAlert('Please enter a valid email address.');
+    if (!email || !email.includes('@') || !email.includes('.')) {
+      this.showAlert('Invalid email address.', 'error');
       return;
     }
 
     if (!password || password.length < 6) {
-      this.showAlert('Password must be at least 6 characters long.');
+      this.showAlert('Password must be at least 6 characters.', 'error');
       return;
     }
 
-    if (this.currentTab === 'signup') {
-      if (!fullName) {
-        this.showAlert('Please enter your full name.');
-        return;
-      }
-      if (password !== confirmPassword) {
-        this.showAlert('Passwords do not match.');
-        return;
-      }
-    }
-
-    // Set Loading state
+    // Set Loading state & disable button
+    this.isSubmitting = true;
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.textContent = this.currentTab === 'login' ? 'Signing In...' : 'Creating Account...';
+      submitBtn.textContent = this.currentTab === 'login' ? 'Signing in...' : 'Creating account...';
     }
 
     try {
       if (this.currentTab === 'signup') {
         const data = await supabaseService.signUp(email, password, fullName);
-        
-        if (data?.user) {
+
+        // Check if an immediate session was returned
+        if (data?.session && data?.user) {
           stateManager.setAuthUser(data.user);
           SoundEngine.playSuccess();
           NavigationManager.closeModal('modal-auth');
-          NavigationManager.showToast(`🎉 Welcome to PocketPe, ${fullName}!`, 'success');
+          NavigationManager.switchTab('home'); // Open existing dashboard
+          const displayName = fullName || data.user.user_metadata?.full_name || email.split('@')[0];
+          NavigationManager.showToast(`🎉 Welcome to PocketPe, ${displayName}!`, 'success');
+        } else if (data?.user) {
+          // Email confirmation is required
+          this.showAlert('Account created. Please check your email to verify your account.', 'success');
+          SoundEngine.playSuccess();
         } else {
-          // If Supabase has email confirmation enabled
-          this.showAlert('Confirmation email sent! Please check your inbox or verify in Supabase.', 'success');
+          this.showAlert('Account created. Please check your email to verify your account.', 'success');
         }
       } else {
         const data = await supabaseService.signIn(email, password);
@@ -283,16 +268,20 @@ export class AuthModal {
           stateManager.setAuthUser(data.user);
           SoundEngine.playSuccess();
           NavigationManager.closeModal('modal-auth');
+          NavigationManager.switchTab('home'); // Open existing dashboard
           const displayName = data.user.user_metadata?.full_name || email.split('@')[0];
           NavigationManager.showToast(`✨ Welcome back, ${displayName}!`, 'success');
+        } else {
+          this.showAlert('Unable to sign in. Please check your credentials.', 'error');
         }
       }
     } catch (err) {
       console.error('Authentication Error:', err);
       SoundEngine.playAlert();
-      const friendlyMsg = this.formatAuthError(err.message || 'Authentication failed');
+      const friendlyMsg = this.formatAuthError(err.message || 'Authentication error');
       this.showAlert(friendlyMsg, 'error');
     } finally {
+      this.isSubmitting = false;
       if (submitBtn) {
         submitBtn.disabled = false;
         submitBtn.textContent = this.currentTab === 'login' ? 'Log In' : 'Create Account';
@@ -300,18 +289,26 @@ export class AuthModal {
     }
   }
 
-  static formatAuthError(msg) {
-    if (msg.includes('Invalid login credentials')) {
-      return 'Incorrect email or password. Please verify your credentials.';
+  static formatAuthError(msg = '') {
+    const lower = String(msg).toLowerCase();
+
+    if (lower.includes('user already registered') || lower.includes('already registered') || lower.includes('email already in use')) {
+      return 'Email already registered.';
     }
-    if (msg.includes('User already registered')) {
-      return 'An account with this email already exists. Please log in instead.';
-    }
-    if (msg.includes('Password should be at least')) {
+    if (lower.includes('password should be at least') || lower.includes('weak_password') || lower.includes('password must be at least')) {
       return 'Password must be at least 6 characters.';
     }
-    if (msg.includes('Failed to fetch') || msg.includes('network')) {
-      return 'Could not reach Supabase endpoint. Please verify your Project URL in Connection Settings.';
+    if (lower.includes('invalid email') || lower.includes('unable to validate email')) {
+      return 'Invalid email address.';
+    }
+    if (lower.includes('invalid login credentials') || lower.includes('invalid credentials')) {
+      return 'Incorrect email or password.';
+    }
+    if (lower.includes('email not confirmed')) {
+      return 'Please check your email to verify your account before logging in.';
+    }
+    if (lower.includes('failed to fetch') || lower.includes('network') || lower.includes('err_name_not_resolved') || lower.includes('connection failed')) {
+      return 'Unable to connect to Supabase.';
     }
     return msg;
   }

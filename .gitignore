@@ -11,3 +11,8 @@ desktop.ini
 *.log
 __pycache__/
 *.pyc
+
+# Local Environment Variables
+.env
+.env.local
+.env.*.local

@@ -11,7 +11,7 @@ import { CategoryEngine } from '../engines/categoryEngine.js';
 import { WalletEngine } from '../engines/walletEngine.js';
 import { TransactionEngine } from '../engines/transactionEngine.js';
 import { FraudEngine, RISK_LEVELS } from '../engines/fraudEngine.js';
-import { UpiQrEngine, parseUpiQr, getCategoryFromMcc, getWalletForCategory, MCC_CATEGORY_MAP } from '../engines/upiQrEngine.js';
+import { UpiQrEngine, parseUpiQr, getCategoryFromMcc, getPocketPeCategory, getWalletForCategory, MCC_CATEGORY_MAP } from '../engines/upiQrEngine.js';
 import { supabaseService } from '../services/supabaseService.js';
 import { FraudModal } from './fraudModal.js';
 import { NavigationManager } from './navigation.js';
@@ -79,103 +79,109 @@ export class PayView {
         <span class="prototype-tag">Live Camera + Shield</span>
       </div>
 
-      <!-- Live QR Scanner Viewport -->
-      <div class="scanner-viewfinder" id="scanner-box">
-        <!-- Live Video Element -->
-        <video id="camera-stream" class="camera-stream-video" autoplay playsinline muted></video>
+      <div class="pay-responsive-grid">
+        <div class="pay-camera-pane">
+          <!-- Live QR Scanner Viewport -->
+          <div class="scanner-viewfinder" id="scanner-box">
+            <!-- Live Video Element -->
+            <video id="camera-stream" class="camera-stream-video" autoplay playsinline muted></video>
 
-        <!-- Offline / Permission Prompt Overlay -->
-        <div class="camera-offline-view" id="camera-offline-prompt">
-          <div style="font-size: 2.2rem; margin-bottom: 2px;">📷</div>
-          <div style="font-weight: 700; font-size: var(--text-sm); color: var(--text-primary);">Live QR Camera</div>
-          <p style="font-size: 0.75rem; color: var(--text-muted); max-width: 220px; line-height: 1.4;">
-            Point at any real UPI QR code (Google Pay, PhonePe, Paytm, BharatPe)
-          </p>
-          <button class="btn btn-sm btn-primary" id="btn-start-camera-overlay" style="width: auto; padding: 7px 18px; margin-top: 6px;">
-            ⚡ Turn Camera On
+            <!-- Offline / Permission Prompt Overlay -->
+            <div class="camera-offline-view" id="camera-offline-prompt">
+              <div style="font-size: 2.2rem; margin-bottom: 2px;">📷</div>
+              <div style="font-weight: 700; font-size: var(--text-sm); color: var(--text-primary);">Live QR Camera</div>
+              <p style="font-size: 0.75rem; color: var(--text-muted); max-width: 220px; line-height: 1.4;">
+                Point at any real UPI QR code (Google Pay, PhonePe, Paytm, BharatPe)
+              </p>
+              <button class="btn btn-sm btn-primary" id="btn-start-camera-overlay" style="width: auto; padding: 7px 18px; margin-top: 6px;">
+                ⚡ Turn Camera On
+              </button>
+            </div>
+
+            <!-- Camera Status Indicator -->
+            <div class="camera-status-pill" id="camera-status">
+              <span class="camera-status-dot" id="camera-status-dot"></span>
+              <span id="camera-status-text">Camera Ready</span>
+            </div>
+
+            <!-- Animated Scanner HUD Box -->
+            <div class="scanner-grid"></div>
+            <div class="scanner-box">
+              <div class="scan-corner top-left"></div>
+              <div class="scan-corner top-right"></div>
+              <div class="scan-corner bottom-left"></div>
+              <div class="scan-corner bottom-right"></div>
+              <div class="laser-beam"></div>
+            </div>
+            <div class="scanner-hint" id="scanner-hint-text">Align QR code inside frame</div>
+
+            <!-- Hidden canvas for pixel extraction -->
+            <canvas id="qr-scan-canvas" style="display: none;"></canvas>
+            <input type="file" id="input-qr-file" accept="image/*" style="display: none;" />
+          </div>
+
+          <!-- Live Camera & UPI Controls Row -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 12px;">
+            <button class="btn btn-secondary btn-sm" id="btn-toggle-camera" title="Start or Stop Live Camera">
+              <span>📷</span> <span>Camera</span>
+            </button>
+            <button class="btn btn-secondary btn-sm" id="btn-flip-camera" title="Switch Front/Back Camera">
+              <span>🔄</span> <span>Flip</span>
+            </button>
+            <button class="btn btn-secondary btn-sm" id="btn-upload-qr" title="Scan QR Code from Photo / Gallery">
+              <span>🖼️</span> <span>Upload</span>
+            </button>
+          </div>
+
+          <!-- Custom UPI / Manual Entry Button -->
+          <button class="btn btn-secondary btn-sm" id="btn-custom-qr-input" style="width: 100%; margin-top: 10px;">
+            <span>✏️</span> <span>Custom Pay / Paste UPI ID / Link</span>
           </button>
         </div>
 
-        <!-- Camera Status Indicator -->
-        <div class="camera-status-pill" id="camera-status">
-          <span class="camera-status-dot" id="camera-status-dot"></span>
-          <span id="camera-status-text">Camera Ready</span>
-        </div>
-
-        <!-- Animated Scanner HUD Box -->
-        <div class="scanner-grid"></div>
-        <div class="scanner-box">
-          <div class="scan-corner top-left"></div>
-          <div class="scan-corner top-right"></div>
-          <div class="scan-corner bottom-left"></div>
-          <div class="scan-corner bottom-right"></div>
-          <div class="laser-beam"></div>
-        </div>
-        <div class="scanner-hint" id="scanner-hint-text">Align QR code inside frame</div>
-
-        <!-- Hidden canvas for pixel extraction -->
-        <canvas id="qr-scan-canvas" style="display: none;"></canvas>
-        <input type="file" id="input-qr-file" accept="image/*" style="display: none;" />
-      </div>
-
-      <!-- Live Camera & UPI Controls Row -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
-        <button class="btn btn-secondary btn-sm" id="btn-toggle-camera" title="Start or Stop Live Camera">
-          <span>📷</span> <span>Camera</span>
-        </button>
-        <button class="btn btn-secondary btn-sm" id="btn-flip-camera" title="Switch Front/Back Camera">
-          <span>🔄</span> <span>Flip</span>
-        </button>
-        <button class="btn btn-secondary btn-sm" id="btn-upload-qr" title="Scan QR Code from Photo / Gallery">
-          <span>🖼️</span> <span>Upload</span>
-        </button>
-      </div>
-
-      <!-- Custom UPI / Manual Entry Button -->
-      <button class="btn btn-secondary btn-sm" id="btn-custom-qr-input" style="width: 100%;">
-        <span>✏️</span> <span>Custom Pay / Paste UPI ID / Link</span>
-      </button>
-
-      <!-- Quick Demo QR Merchants -->
-      <div class="demo-merchants-section">
-        <div class="title" style="display: flex; justify-content: space-between; align-items: center;">
-          <span>Demo QR Merchants (Instant Test):</span>
-          <span style="font-size: 0.72rem; color: var(--text-muted);">Tap to simulate</span>
-        </div>
-        <div class="merchants-scroll-list">
-          ${DEMO_MERCHANTS.map((m) => {
-            const risk = FraudEngine.evaluateUpiRisk(m.upiId);
-            const isHigh = risk.level === RISK_LEVELS.HIGH;
-            const isCaution = risk.level === RISK_LEVELS.CAUTION;
-
-            return `
-            <div class="merchant-item-card ${isHigh ? 'merchant-item-card-risk' : ''}" data-merchant-id="${m.id}">
-              <div class="merchant-info">
-                <div class="merchant-avatar">${m.icon}</div>
-                <div class="merchant-meta">
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <h4>${m.name}</h4>
-                    ${isHigh || isCaution ? FraudModal.renderRiskBadgeHtml(m.upiId, false) : ''}
-                  </div>
-                  <p>${m.category} • <span class="mono" style="font-size: 0.7rem;">${m.upiId || ''}</span></p>
-                </div>
-              </div>
-              <div class="merchant-amount-tag">
-                ${WalletEngine.formatRupee(m.defaultAmount)}
-              </div>
+        <div class="pay-merchants-pane">
+          <!-- Quick Demo QR Merchants -->
+          <div class="demo-merchants-section">
+            <div class="title" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>Demo QR Merchants (Instant Test):</span>
+              <span style="font-size: 0.72rem; color: var(--text-muted);">Tap to simulate</span>
             </div>
-          `;
-          }).join('')}
-        </div>
-      </div>
+            <div class="merchants-scroll-list">
+              ${DEMO_MERCHANTS.map((m) => {
+                const risk = FraudEngine.evaluateUpiRisk(m.upiId);
+                const isHigh = risk.level === RISK_LEVELS.HIGH;
+                const isCaution = risk.level === RISK_LEVELS.CAUTION;
 
-      <!-- Insufficient Balance Test Shortcut -->
-      <div class="card" style="padding: 12px 16px; background: var(--bg-subtle); display: flex; align-items: center; justify-content: space-between;">
-        <div>
-          <div style="font-size: var(--text-xs); font-weight: 700; color: var(--text-primary);">🧪 Test Payment Protection Shield</div>
-          <div style="font-size: 0.72rem; color: var(--text-muted);">Simulate paying ₹2,500 from Transport (balance is low)</div>
+                return `
+                <div class="merchant-item-card ${isHigh ? 'merchant-item-card-risk' : ''}" data-merchant-id="${m.id}">
+                  <div class="merchant-info">
+                    <div class="merchant-avatar">${m.icon}</div>
+                    <div class="merchant-meta">
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <h4>${m.name}</h4>
+                        ${isHigh || isCaution ? FraudModal.renderRiskBadgeHtml(m.upiId, false) : ''}
+                      </div>
+                      <p>${m.category} • <span class="mono" style="font-size: 0.7rem;">${m.upiId || ''}</span></p>
+                    </div>
+                  </div>
+                  <div class="merchant-amount-tag">
+                    ${WalletEngine.formatRupee(m.defaultAmount)}
+                  </div>
+                </div>
+              `;
+              }).join('')}
+            </div>
+          </div>
+
+          <!-- Insufficient Balance Test Shortcut -->
+          <div class="card" style="padding: 12px 16px; background: var(--bg-subtle); display: flex; align-items: center; justify-content: space-between; margin-top: 12px;">
+            <div>
+              <div style="font-size: var(--text-xs); font-weight: 700; color: var(--text-primary);">🧪 Test Payment Protection Shield</div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">Simulate paying ₹2,500 from Transport (balance is low)</div>
+            </div>
+            <button class="btn btn-sm btn-secondary" id="btn-test-deficit" style="width: auto;">Test Shield</button>
+          </div>
         </div>
-        <button class="btn btn-sm btn-secondary" id="btn-test-deficit" style="width: auto;">Test Shield</button>
       </div>
     `;
 
@@ -497,7 +503,7 @@ export class PayView {
     const upiResult = parseUpiQr(rawPayload);
 
     if (!upiResult.isUpi) {
-      NavigationManager.showToast(upiResult.error || "This QR doesn't appear to be a UPI payment QR.", 'warning');
+      NavigationManager.showToast(upiResult.error || 'This QR is not a supported UPI payment QR.', 'warning');
       setTimeout(() => {
         if (this.stream) {
           this.isScanning = true;
@@ -542,18 +548,20 @@ export class PayView {
     const userId = stateManager.getUserId();
     const allWallets = stateManager.getWallets();
 
-    // STEP 3: MCC Category Detection
-    const mccCategory = getCategoryFromMcc(mc);
+    // STAGE 2: MCC Category Detection
+    const merchantCategory = getCategoryFromMcc(mc);
 
     // DECISION BRANCH 1: Valid MCC exists!
-    if (mccCategory) {
-      // STEP 4: Category → Wallet mapping
-      const walletMatch = getWalletForCategory(mccCategory, allWallets);
+    if (merchantCategory) {
+      // STAGE 3: Translate merchant category to PocketPe internal category
+      const pocketPeCategory = getPocketPeCategory(merchantCategory);
+      // STAGE 4: Category → Wallet mapping
+      const walletMatch = getWalletForCategory(pocketPeCategory, allWallets);
       const suggestedWallet = walletMatch.wallet;
       const categoryIcon = MCC_CATEGORY_MAP[mc]?.icon || '🏷️';
       const reason = 'Based on the merchant category.';
 
-      // STEP 12: Dev logging only (never sensitive authentication info)
+      // Dev logging (never logs passwords, PINs, or sensitive tokens)
       console.log('🔍 [PocketPe Dev QR Scan]', {
         'raw QR detected': rawPayload,
         'is UPI': true,
@@ -561,18 +569,19 @@ export class PayView {
         pn,
         mc,
         amount: amount || 'Not specified',
-        'detected category': mccCategory,
+        'merchant category': merchantCategory,
+        'pocketpe category': pocketPeCategory,
         'suggested wallet': suggestedWallet ? suggestedWallet.name : 'None',
         source: 'mcc',
       });
 
       if (suggestedWallet) {
-        // STEP 8 & 11: Merchant QR flow with suggested wallet
+        // Merchant QR flow with suggested wallet
         this.showSuggestedWalletModal({
           merchantName: pn,
           upiId: pa,
           mcc: mc,
-          category: mccCategory,
+          category: pocketPeCategory,
           icon: categoryIcon,
           suggestedWallet,
           reason,
@@ -586,10 +595,10 @@ export class PayView {
           merchantName: pn,
           upiId: pa,
           mcc: mc,
-          category: mccCategory,
+          category: pocketPeCategory,
           icon: categoryIcon,
           amount,
-          promptText: `No matching wallet found for ${mccCategory}. Choose a wallet:`,
+          promptText: `No matching wallet found for ${pocketPeCategory}. Choose a wallet:`,
           isPersonal: false,
           isFirstTime: false,
           askRemember: false,
@@ -1677,6 +1686,24 @@ export class PayView {
 
       SoundEngine.playTap();
       NavigationManager.closeModal('modal-custom-merchant');
+
+      // If user pasted a full upi:// URI, decode via QR payload handler
+      if (rawInput.toLowerCase().startsWith('upi://') || rawInput.includes('pa=')) {
+        this.handleScannedQrPayload(rawInput);
+        return;
+      }
+
+      // If user provided a UPI ID (e.g., friend@upi or merchant@okaxis), execute 4-tier decision hierarchy
+      if (upiId) {
+        this.processUpiPaymentDecision({
+          rawPayload: rawInput,
+          pa: upiId,
+          pn: merchantName || upiId.split('@')[0],
+          mc: mcc,
+          amount: amt,
+        });
+        return;
+      }
 
       this.initiatePaymentFlow({
         merchantName,

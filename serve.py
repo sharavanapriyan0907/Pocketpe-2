@@ -27,6 +27,38 @@ class PocketPeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DIRECTORY, **kwargs)
 
+    def do_GET(self):
+        if self.path.split('?')[0] in ('/env.js', './env.js'):
+            env_vars = {}
+            env_path = os.path.join(DIRECTORY, '.env')
+            if os.path.exists(env_path):
+                try:
+                    with open(env_path, 'r', encoding='utf-8') as f:
+                        for line in f:
+                            line = line.strip()
+                            if line and not line.startswith('#') and '=' in line:
+                                k, v = line.split('=', 1)
+                                env_vars[k.strip()] = v.strip().strip('"').strip("'")
+                except Exception:
+                    pass
+
+            for key in ('SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_PUBLISHABLE_KEY', 'NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_ANON_KEY', 'VITE_SUPABASE_URL', 'VITE_SUPABASE_ANON_KEY'):
+                if key in os.environ and key not in env_vars:
+                    env_vars[key] = os.environ[key]
+
+            url = env_vars.get('SUPABASE_URL') or env_vars.get('NEXT_PUBLIC_SUPABASE_URL') or env_vars.get('VITE_SUPABASE_URL') or 'https://gevjalpbbqesuggnllsx.supabase.co'
+            key = env_vars.get('SUPABASE_ANON_KEY') or env_vars.get('SUPABASE_PUBLISHABLE_KEY') or env_vars.get('NEXT_PUBLIC_SUPABASE_ANON_KEY') or env_vars.get('VITE_SUPABASE_ANON_KEY') or ''
+
+            content = f'window.__ENV__ = {{\n  SUPABASE_URL: "{url}",\n  SUPABASE_ANON_KEY: "{key}"\n}};\n'.encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/javascript; charset=utf-8')
+            self.send_header('Content-Length', str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
+            return
+
+        super().do_GET()
+
     def end_headers(self):
         # Enable CORS and disable aggressive caching for local development
         self.send_header('Access-Control-Allow-Origin', '*')

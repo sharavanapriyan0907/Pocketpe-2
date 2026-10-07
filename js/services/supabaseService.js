@@ -9,10 +9,30 @@ import { APP_CONFIG } from '../config.js';
 class SupabaseService {
   constructor() {
     this.client = null;
-    this.url = localStorage.getItem(APP_CONFIG.STORAGE_KEYS.SUPABASE_URL) || APP_CONFIG.SUPABASE.DEFAULT_URL;
-    this.anonKey = localStorage.getItem(APP_CONFIG.STORAGE_KEYS.SUPABASE_ANON_KEY) || APP_CONFIG.SUPABASE.DEFAULT_ANON_KEY;
+    this.url = this.sanitizeUrl(
+      (typeof window !== 'undefined' && window.__ENV__?.SUPABASE_URL) ||
+      localStorage.getItem(APP_CONFIG.STORAGE_KEYS.SUPABASE_URL) ||
+      APP_CONFIG.SUPABASE.DEFAULT_URL
+    );
+    this.anonKey = (
+      (typeof window !== 'undefined' && (window.__ENV__?.SUPABASE_ANON_KEY || window.__ENV__?.SUPABASE_PUBLISHABLE_KEY)) ||
+      localStorage.getItem(APP_CONFIG.STORAGE_KEYS.SUPABASE_ANON_KEY) ||
+      APP_CONFIG.SUPABASE.DEFAULT_ANON_KEY || ''
+    ).trim();
     this.initialized = false;
     this.authListeners = new Set();
+  }
+
+  /**
+   * Normalize Supabase project URL by removing trailing slashes, /rest/v1, etc.
+   */
+  sanitizeUrl(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== 'string') return '';
+    let clean = rawUrl.trim();
+    clean = clean.replace(/\/rest\/v1\/?$/i, '');
+    clean = clean.replace(/\/auth\/v1\/?$/i, '');
+    clean = clean.replace(/\/+$/, '');
+    return clean;
   }
 
   /**
@@ -41,7 +61,7 @@ class SupabaseService {
    * Update credentials at runtime and re-initialize client
    */
   async updateConfig(url, anonKey) {
-    this.url = (url || '').trim();
+    this.url = this.sanitizeUrl(url);
     this.anonKey = (anonKey || '').trim();
     localStorage.setItem(APP_CONFIG.STORAGE_KEYS.SUPABASE_URL, this.url);
     localStorage.setItem(APP_CONFIG.STORAGE_KEYS.SUPABASE_ANON_KEY, this.anonKey);
@@ -507,6 +527,41 @@ class SupabaseService {
       map[upiId.toLowerCase()] = record;
       localStorage.setItem(storageKey, JSON.stringify(map));
     } catch (e) {}
+  }
+
+  /**
+   * Test Supabase connectivity and API key validity
+   */
+  async testConnection() {
+    await this.init();
+    if (!this.url || !this.anonKey) {
+      return { success: false, message: 'Supabase Project URL or Anon Key is missing.' };
+    }
+
+    try {
+      // 1. Check Auth service endpoint
+      const authRes = await fetch(`${this.url}/auth/v1/settings`, {
+        headers: {
+          apikey: this.anonKey,
+        },
+      });
+
+      if (authRes.ok) {
+        return { success: true, message: 'Successfully reached Supabase project endpoint!' };
+      }
+
+      // 2. Fallback check against PostgREST
+      if (this.client) {
+        const { error } = await this.client.from('merchant_preferences').select('upi_id').limit(1);
+        if (!error || !error.message?.includes('Failed to fetch')) {
+          return { success: true, message: 'Database connection verified.' };
+        }
+      }
+
+      return { success: false, message: `Server returned HTTP ${authRes.status}: ${authRes.statusText}` };
+    } catch (err) {
+      return { success: false, message: err.message || 'Network error reaching Supabase endpoint.' };
+    }
   }
 }
 

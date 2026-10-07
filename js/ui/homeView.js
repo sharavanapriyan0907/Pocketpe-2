@@ -141,7 +141,7 @@ export class HomeView {
       })()}
 
       <!-- Quick Action Tiles -->
-      <div class="quick-actions-grid" style="grid-template-columns: repeat(3, 1fr);">
+      <div class="quick-actions-grid">
         <div class="action-tile" id="action-receive-money" role="button" tabindex="0">
           <div class="action-icon">📥</div>
           <span class="action-label">Receive</span>
