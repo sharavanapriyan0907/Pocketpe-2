@@ -89,7 +89,9 @@ class StateManager {
 
     const prevUserId = this.state.user?.id;
     const newUserId = supabaseUser.id;
-    const fullName = supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'PocketPe User';
+    const fullName = supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'PocketPe User';
+    const avatarUrl = supabaseUser.user_metadata?.avatar_url || supabaseUser.user_metadata?.picture || null;
+    const provider = supabaseUser.app_metadata?.provider || (supabaseUser.app_metadata?.providers?.[0]) || 'email';
 
     // Persist previous user state if transitioning
     if (this.state.user?.isAuthenticated && prevUserId && prevUserId !== newUserId) {
@@ -101,6 +103,8 @@ class StateManager {
       id: newUserId,
       email: supabaseUser.email,
       name: fullName,
+      avatarUrl: avatarUrl,
+      provider: provider,
       isAuthenticated: true,
       supabaseUser: {
         id: supabaseUser.id,
@@ -108,13 +112,14 @@ class StateManager {
         createdAt: supabaseUser.created_at,
         lastSignInAt: supabaseUser.last_sign_in_at,
         metadata: supabaseUser.user_metadata || {},
+        appMetadata: supabaseUser.app_metadata || {},
       },
     };
 
     // Load or initialize user-specific wallets and merchant preferences
     this.loadUserScopedData(newUserId);
 
-    console.log(`👤 Exposing authenticated Supabase user.id: ${newUserId}`);
+    console.log(`👤 Exposing authenticated Supabase user.id: ${newUserId} (${provider})`);
     this.notify('auth:changed', this.state.user);
     this.notify('state:changed');
     return this.state.user;
@@ -129,6 +134,8 @@ class StateManager {
       id: 'usr_guest',
       name: 'Guest User',
       email: null,
+      avatarUrl: null,
+      provider: null,
       isAuthenticated: false,
       greeting: 'Welcome',
       simulatedBank: 'Simulated Demo Bank',

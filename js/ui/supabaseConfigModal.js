@@ -83,6 +83,10 @@ export class SupabaseConfigModal {
         <div style="font-size: 0.72rem; color: var(--text-muted); line-height: 1.4;">
           💡 Find these credentials in your Supabase Dashboard: <strong>Project Settings → API → Project URL & Project API Keys (anon public)</strong>.
         </div>
+
+        <div style="font-size: 0.72rem; color: var(--text-secondary); line-height: 1.4; background: rgba(66, 133, 244, 0.08); border: 1px solid rgba(66, 133, 244, 0.25); padding: 8px 10px; border-radius: var(--radius-sm);">
+          🌐 <strong>Google OAuth Tip:</strong> Under Supabase Dashboard → <strong>Authentication → URL Configuration → Redirect URLs</strong>, make sure <code style="font-family: var(--font-mono); font-size: 0.70rem; color: #4285F4;">${window.location.origin}/*</code> is allowed.
+        </div>
       </form>
     `;
 

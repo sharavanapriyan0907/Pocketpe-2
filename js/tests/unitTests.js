@@ -479,6 +479,45 @@ export class UnitTests {
       );
     })();
 
+    // Test 19: Google OAuth Service & Profile Mapping
+    (() => {
+      const hasGoogleMethod = typeof supabaseService.signInWithGoogle === 'function';
+
+      // Mock Google OAuth user object returned by Supabase
+      const mockGoogleUser = {
+        id: 'google_oauth_usr_998877',
+        email: 'sharath.student@gmail.com',
+        created_at: new Date().toISOString(),
+        last_sign_in_at: new Date().toISOString(),
+        app_metadata: {
+          provider: 'google',
+          providers: ['google'],
+        },
+        user_metadata: {
+          full_name: 'Sharath Google User',
+          name: 'Sharath Google User',
+          avatar_url: 'https://lh3.googleusercontent.com/a/mock-avatar-123',
+          picture: 'https://lh3.googleusercontent.com/a/mock-avatar-123',
+          email: 'sharath.student@gmail.com',
+        },
+      };
+
+      stateManager.setAuthUser(mockGoogleUser);
+      const state = stateManager.getState();
+
+      assert(
+        'Google OAuth: Service provides signInWithGoogle and captures Google avatar, provider and name',
+        hasGoogleMethod &&
+          state.user.id === 'google_oauth_usr_998877' &&
+          state.user.email === 'sharath.student@gmail.com' &&
+          state.user.name === 'Sharath Google User' &&
+          state.user.provider === 'google' &&
+          state.user.avatarUrl === 'https://lh3.googleusercontent.com/a/mock-avatar-123' &&
+          state.user.isAuthenticated === true,
+        `Provider: ${state.user.provider}, Avatar: ${state.user.avatarUrl}`
+      );
+    })();
+
     // =========================================================================
     // FEATURE 4: UPI QR CODE PARSING, MCC MAPPING & PERSONAL QR MEMORY TESTS
     // =========================================================================

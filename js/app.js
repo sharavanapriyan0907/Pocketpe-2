@@ -75,6 +75,9 @@ class App {
     try {
       await supabaseService.init();
 
+      // Check for OAuth error in URL callback parameters
+      this.handleOAuthCallbackParams();
+
       // Check current session
       const user = await supabaseService.getUser();
       if (user) {
@@ -87,12 +90,27 @@ class App {
       supabaseService.onAuthStateChange(async (event, session) => {
         console.log('🔄 Supabase Auth Event:', event);
         if (session?.user) {
+          const wasAuthed = stateManager.isUserAuthenticated();
+          const prevId = stateManager.getUserId();
+
           stateManager.setAuthUser(session.user);
           await this.syncUserDataWithSupabase(session.user.id);
+
+          // If freshly authenticated from Google OAuth or login
+          if (!wasAuthed || prevId !== session.user.id) {
+            const displayName = session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || 'User';
+            SoundEngine.playSuccess();
+            NavigationManager.showToast(`✨ Welcome to PocketPe, ${displayName}!`, 'success', 3500);
+          }
         } else if (event === 'SIGNED_OUT') {
           stateManager.clearAuthUser();
         }
         this.updateDesktopAuthUI();
+
+        // Clean up hash fragments or code query params after OAuth processing
+        if (window.location.search.includes('code=') || window.location.hash.includes('access_token=')) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
       });
 
       stateManager.subscribe('auth:changed', async () => {
@@ -127,6 +145,25 @@ class App {
       });
     } catch (e) {
       console.warn('Supabase auth initialization check completed with notice:', e);
+    }
+  }
+
+  static handleOAuthCallbackParams() {
+    try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const hash = window.location.hash.startsWith('#') ? window.location.hash.substring(1) : window.location.hash;
+      const hashParams = new URLSearchParams(hash);
+
+      const errorMsg = searchParams.get('error_description') || hashParams.get('error_description') || searchParams.get('error') || hashParams.get('error');
+
+      if (errorMsg) {
+        console.warn('Google OAuth error returned:', errorMsg);
+        SoundEngine.playAlert();
+        NavigationManager.showToast(`Sign in notice: ${errorMsg}`, 'error', 4500);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    } catch (e) {
+      console.warn('OAuth callback parameter inspection notice:', e);
     }
   }
 

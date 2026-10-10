@@ -54,7 +54,11 @@ export class HomeView {
       <!-- Top Header -->
       <div class="home-header">
         <div class="user-profile-badge" id="btn-home-profile-badge" style="cursor: pointer;" title="Profile & Account">
-          <div class="avatar">${initials}</div>
+          <div class="avatar" style="overflow: hidden; display: flex; align-items: center; justify-content: center;">
+            ${state.user?.avatarUrl
+              ? `<img src="${state.user.avatarUrl}" alt="${state.user.name}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'; this.parentElement.innerText='${initials}';" />`
+              : initials}
+          </div>
           <div>
             <div class="greeting-text">${state.user?.greeting || 'Good day'} ${state.user?.isAuthenticated ? '●' : ''}</div>
             <div class="user-name">${state.user.name}</div>

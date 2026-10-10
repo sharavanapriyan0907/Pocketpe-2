@@ -210,6 +210,40 @@ class SupabaseService {
   }
 
   /**
+   * Google OAuth sign in / sign up
+   */
+  async signInWithGoogle() {
+    await this.init();
+    if (!this.client) {
+      throw new Error('Supabase client is not initialized. Please configure your Supabase Project URL and Anon Key.');
+    }
+
+    // Determine redirect URL: current origin + pathname (without query or hash)
+    const redirectUrl = window.location.origin + window.location.pathname;
+
+    const { data, error } = await this.client.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    if (data?.url) {
+      window.location.assign(data.url);
+    }
+
+    return data;
+  }
+
+  /**
    * Sign out current user
    */
   async signOut() {
