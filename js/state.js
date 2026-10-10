@@ -22,7 +22,7 @@ class StateManager {
       const stored = localStorage.getItem(APP_CONFIG.STORAGE_KEYS.APP_STATE);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.wallets) {
+        if (parsed) {
           // Ensure new feature namespaces exist on legacy state
           if (!parsed.fraudDetection) {
             parsed.fraudDetection = JSON.parse(JSON.stringify(INITIAL_FRAUD_DATA));
@@ -36,7 +36,6 @@ class StateManager {
           if (!parsed.commitments || !Array.isArray(parsed.commitments)) {
             parsed.commitments = [];
           }
-          // Filter out legacy predetermined transactions
           if (Array.isArray(parsed.transactions)) {
             parsed.transactions = parsed.transactions.filter(
               (t) => !['tx_101', 'tx_102', 'tx_103', 'tx_104', 'tx_105'].includes(t.id)
@@ -44,6 +43,25 @@ class StateManager {
           } else {
             parsed.transactions = [];
           }
+
+          // If stored state is unauthenticated or has legacy demo user id, ensure private data is cleared
+          if (!parsed.user || !parsed.user.isAuthenticated || parsed.user.id === 'usr_001' || parsed.user.id === 'usr_guest') {
+            parsed.user = {
+              id: null,
+              name: '',
+              email: null,
+              isAuthenticated: false,
+              greeting: 'Welcome',
+              bankName: '',
+              accountNumber: '',
+              supabaseUser: null,
+            };
+            parsed.wallets = [];
+            parsed.transactions = [];
+            parsed.commitments = [];
+            parsed.activeTab = 'auth';
+          }
+
           return parsed;
         }
       }
@@ -53,21 +71,21 @@ class StateManager {
 
     return {
       user: {
-        id: 'usr_001',
-        name: 'Sharath Kumar',
+        id: null,
+        name: '',
         email: null,
         isAuthenticated: false,
-        greeting: 'Good morning',
-        bankName: 'HDFC Bank',
-        accountNumber: '••• 4821',
+        greeting: 'Welcome',
+        bankName: '',
+        accountNumber: '',
         supabaseUser: null,
       },
-      wallets: JSON.parse(JSON.stringify(INITIAL_WALLETS)),
+      wallets: [],
       transactions: [],
       commitments: [],
       learnedMerchants: {},
       isBalanceHidden: false,
-      activeTab: 'home',
+      activeTab: 'auth',
       fraudDetection: JSON.parse(JSON.stringify(INITIAL_FRAUD_DATA)),
       collectRequests: [],
       splitBill: JSON.parse(JSON.stringify(INITIAL_SPLIT_DATA)),
@@ -87,7 +105,7 @@ class StateManager {
 
   // --- Supabase Authentication & User-Scoped Data Helpers ---
   getUserId() {
-    return this.state.user?.id || 'usr_001';
+    return this.state.user?.id || null;
   }
 
   isUserAuthenticated() {
@@ -118,6 +136,8 @@ class StateManager {
       avatarUrl: avatarUrl,
       provider: provider,
       isAuthenticated: true,
+      bankName: this.state.user?.bankName || 'HDFC Bank',
+      accountNumber: this.state.user?.accountNumber || '••• 4821',
       supabaseUser: {
         id: supabaseUser.id,
         email: supabaseUser.email,
@@ -143,29 +163,40 @@ class StateManager {
     }
 
     this.state.user = {
-      id: 'usr_guest',
-      name: 'Guest User',
+      id: null,
+      name: '',
       email: null,
       avatarUrl: null,
       provider: null,
       isAuthenticated: false,
       greeting: 'Welcome',
-      bankName: 'HDFC Bank',
-      accountNumber: '••• 4821',
+      bankName: '',
+      accountNumber: '',
       supabaseUser: null,
     };
 
-    // Revert to clean guest state
-    this.loadUserScopedData('usr_guest');
+    // Wipe in-memory private data completely
+    this.state.wallets = [];
+    this.state.transactions = [];
+    this.state.commitments = [];
+    this.state.learnedMerchants = {};
+    this.state.collectRequests = [];
+    if (this.state.splitBill) {
+      this.state.splitBill.groups = [];
+      this.state.splitBill.expenses = [];
+      this.state.splitBill.activityLog = [];
+    }
+    this.state.activeTab = 'auth';
 
-    console.log('👤 Cleared authenticated user, reverted to guest');
+    console.log('👤 Cleared authenticated user, wiped in-memory private data');
+    this.saveState();
     this.notify('auth:changed', this.state.user);
     this.notify('state:changed');
     return this.state.user;
   }
 
   loadUserScopedData(userId) {
-    if (!userId) return false;
+    if (!userId || userId === 'usr_guest' || userId === 'usr_001') return false;
     const storageKey = `${APP_CONFIG.STORAGE_KEYS.USER_SCOPED_PREFIX || 'pocketpe_user_'}${userId}_data`;
     try {
       const raw = localStorage.getItem(storageKey);
@@ -173,6 +204,8 @@ class StateManager {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed.wallets) && parsed.wallets.length > 0) {
           this.state.wallets = parsed.wallets;
+        } else {
+          this.state.wallets = JSON.parse(JSON.stringify(INITIAL_WALLETS));
         }
         if (parsed.learnedMerchants && typeof parsed.learnedMerchants === 'object') {
           this.state.learnedMerchants = parsed.learnedMerchants;
@@ -189,14 +222,12 @@ class StateManager {
       console.warn('Could not load user-scoped data:', e);
     }
 
-    // Initialize fresh zero-state wallets for new authenticated user
-    if (userId !== 'usr_001' && userId !== 'usr_guest') {
-      this.state.wallets = JSON.parse(JSON.stringify(INITIAL_WALLETS));
-      this.state.transactions = [];
-      this.state.commitments = [];
-      this.state.learnedMerchants = {};
-      this.saveUserScopedData(userId);
-    }
+    // Initialize fresh demonstration balance wallets for new authenticated user
+    this.state.wallets = JSON.parse(JSON.stringify(INITIAL_WALLETS));
+    this.state.transactions = [];
+    this.state.commitments = [];
+    this.state.learnedMerchants = {};
+    this.saveUserScopedData(userId);
     return false;
   }
 

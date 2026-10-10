@@ -19,6 +19,7 @@ import { FraudModal } from './ui/fraudModal.js';
 import { CollectModal } from './ui/collectModal.js';
 import { SplitBillView } from './ui/splitBillView.js';
 import { supabaseService } from './services/supabaseService.js';
+import { AuthView } from './ui/authView.js';
 import { AuthModal } from './ui/authModal.js';
 import { SupabaseConfigModal } from './ui/supabaseConfigModal.js';
 import { EditProfileModal } from './ui/editProfileModal.js';
@@ -51,14 +52,17 @@ class App {
     // 2. Initialize Navigation
     safeInit('NavigationManager', () => NavigationManager.init());
 
-    // 3. Initialize Tab Views
+    // 3. Initialize Mandatory Authentication View (Entry Screen)
+    safeInit('AuthView', () => AuthView.init());
+
+    // 4. Initialize Tab Views
     safeInit('HomeView', () => HomeView.init());
     safeInit('WalletsView', () => WalletsView.init());
     safeInit('PayView', () => PayView.init());
     safeInit('ActivityView', () => ActivityView.init());
     safeInit('ProfileView', () => ProfileView.init());
 
-    // 4. Initialize Modals
+    // 5. Initialize Modals
     safeInit('SplitView', () => SplitView.init());
     safeInit('ReceiveModal', () => ReceiveModal.init());
     safeInit('MoveModal', () => MoveModal.init());
@@ -72,13 +76,13 @@ class App {
     safeInit('CommitmentModal', () => CommitmentModal.init());
     safeInit('FundingModal', () => FundingModal.init());
 
-    // 5. Initialize Supabase Auth Session
+    // 6. Initialize Supabase Auth Session and Route Guard
     safeInit('initSupabaseAuth', () => this.initSupabaseAuth());
 
-    // 6. Initialize Desktop Stage Controls
+    // 7. Initialize Desktop Stage Controls
     safeInit('setupDesktopControls', () => this.setupDesktopControls());
 
-    // 7. Run Automated Unit Tests on Startup if in Developer Mode
+    // 8. Run Automated Unit Tests on Startup if in Developer Mode
     if (devModeService.isDevMode()) {
       safeInit('UnitTests', () => UnitTests.runAll());
     }
@@ -87,6 +91,7 @@ class App {
   }
 
   static async initSupabaseAuth() {
+    const authLoading = document.getElementById('app-auth-loading');
     try {
       await supabaseService.init();
 
@@ -97,6 +102,16 @@ class App {
       const user = await supabaseService.getUser();
       if (user) {
         stateManager.setAuthUser(user);
+        NavigationManager.updateAuthStateUI(true);
+        const target = NavigationManager.intendedRoute && NavigationManager.intendedRoute !== 'auth'
+          ? NavigationManager.intendedRoute
+          : 'home';
+        NavigationManager.switchTab(target);
+        await this.syncUserDataWithSupabase(user.id);
+      } else {
+        stateManager.clearAuthUser();
+        NavigationManager.updateAuthStateUI(false);
+        NavigationManager.switchTab('auth');
       }
 
       this.updateDesktopAuthUI();
@@ -109,6 +124,11 @@ class App {
           const prevId = stateManager.getUserId();
 
           stateManager.setAuthUser(session.user);
+          NavigationManager.updateAuthStateUI(true);
+          const target = NavigationManager.intendedRoute && NavigationManager.intendedRoute !== 'auth'
+            ? NavigationManager.intendedRoute
+            : 'home';
+          NavigationManager.switchTab(target);
           await this.syncUserDataWithSupabase(session.user.id);
 
           // If freshly authenticated from Google OAuth or login
@@ -119,6 +139,8 @@ class App {
           }
         } else if (event === 'SIGNED_OUT') {
           stateManager.clearAuthUser();
+          NavigationManager.updateAuthStateUI(false);
+          NavigationManager.switchTab('auth');
         }
         this.updateDesktopAuthUI();
 
@@ -160,6 +182,17 @@ class App {
       });
     } catch (e) {
       console.warn('Supabase auth initialization check completed with notice:', e);
+      stateManager.clearAuthUser();
+      NavigationManager.updateAuthStateUI(false);
+      NavigationManager.switchTab('auth');
+    } finally {
+      // Smoothly dismiss session loading overlay
+      if (authLoading) {
+        authLoading.classList.add('hidden');
+        setTimeout(() => {
+          authLoading.style.display = 'none';
+        }, 300);
+      }
     }
   }
 
@@ -266,7 +299,7 @@ class App {
         if (stateManager.isUserAuthenticated()) {
           NavigationManager.switchTab('profile');
         } else {
-          AuthModal.open('login');
+          NavigationManager.switchTab('auth');
         }
         SoundEngine.playTap();
       });

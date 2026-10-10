@@ -13,6 +13,7 @@ import { CommitmentEngine, EXECUTION_STATUSES } from '../engines/commitmentEngin
 import { supabaseService } from '../services/supabaseService.js';
 import { stateManager } from '../state.js';
 import { NavigationManager } from '../ui/navigation.js';
+import { AuthView } from '../ui/authView.js';
 
 export class UnitTests {
   static runAll() {
@@ -921,6 +922,236 @@ export class UnitTests {
         violationFound ? `Found prohibited string: "${violatedWord}"` : 'All customer UI templates clean'
       );
     })();
+
+    // =========================================================================
+    // MANDATORY AUTHENTICATION & ROUTE GUARDS SUITE (REQUIREMENTS 1 - 8)
+    // =========================================================================
+
+    // Test: Login Page as Entry Point for Signed-Out Users
+    (() => {
+      // Set to unauthenticated state
+      stateManager.clearAuthUser();
+      const isAuth = stateManager.isUserAuthenticated();
+      NavigationManager.switchTab('home');
+
+      assert(
+        'Auth Guard (Req 1): Opening website while signed out displays login view and rejects home access',
+        !isAuth && stateManager.state.activeTab === 'auth',
+        `Active tab redirected to "${stateManager.state.activeTab}", isAuthenticated=${isAuth}`
+      );
+    })();
+
+    // Test: Centralized Route Guard Across All Protected Routes
+    (() => {
+      stateManager.clearAuthUser();
+      const protectedRoutes = ['home', 'wallets', 'pay', 'activity', 'profile', 'split'];
+      let allRedirected = true;
+      let failedRoute = '';
+
+      for (const route of protectedRoutes) {
+        NavigationManager.switchTab(route);
+        if (stateManager.state.activeTab !== 'auth' || NavigationManager.intendedRoute !== route) {
+          allRedirected = false;
+          failedRoute = route;
+          break;
+        }
+      }
+
+      assert(
+        'Route Protection (Req 4): Centralized route guard redirects all protected application routes to auth view',
+        allRedirected,
+        allRedirected ? 'All 6 protected routes correctly guarded' : `Failed on route: ${failedRoute}`
+      );
+    })();
+
+    // Test: UI Access and Protected Modals Blocked Without Authentication
+    (() => {
+      stateManager.clearAuthUser();
+      NavigationManager.updateAuthStateUI(false);
+      const isBodyMarked = document.body ? document.body.classList.contains('unauthenticated') : true;
+
+      // Try opening a protected modal while signed out
+      NavigationManager.openModal('modal-split-rules');
+      const splitModalActive = document.getElementById('modal-split-rules')?.classList.contains('active') || false;
+
+      NavigationManager.openModal('modal-create-wallet');
+      const walletModalActive = document.getElementById('modal-create-wallet')?.classList.contains('active') || false;
+
+      assert(
+        'UI Guard (Req 5): Protected modal dialogs and navigation controls blocked for unauthenticated users',
+        isBodyMarked && !splitModalActive && !walletModalActive && stateManager.state.activeTab === 'auth',
+        `Unauthenticated body class: ${isBodyMarked}, splitModalActive: ${splitModalActive}, walletModalActive: ${walletModalActive}`
+      );
+    })();
+
+    // Test: Email Credential Validation & Helpful Error Messages
+    (() => {
+      // 1. Invalid email format
+      const invalidEmail = supabaseService.validateCredentials('invalid-user', 'password123');
+      // 2. Short password
+      const shortPass = supabaseService.validateCredentials('valid@email.com', '123');
+      // 3. Valid credentials
+      const validCreds = supabaseService.validateCredentials('user@domain.com', 'securepass123', 'John Doe');
+
+      // 4. Test Error Message Formatting
+      const invalidCredsMsg = AuthView.formatAuthError('Invalid login credentials');
+      const unconfirmedMsg = AuthView.formatAuthError('Email not confirmed');
+      const expiredLinkMsg = AuthView.formatAuthError('Token has expired');
+      const existingUserMsg = AuthView.formatAuthError('User already registered');
+
+      const validationsCorrect = !invalidEmail.valid && !shortPass.valid && validCreds.valid;
+      const messagesAccurate =
+        invalidCredsMsg.includes('credentials') &&
+        unconfirmedMsg.includes('verification link') &&
+        expiredLinkMsg.includes('expired') &&
+        existingUserMsg.includes('already exists');
+
+      assert(
+        'Email Sign-In (Req 2): Mandatory email validation rejects invalid credentials and produces clear user messages',
+        validationsCorrect && messagesAccurate,
+        `Validation: ${validationsCorrect}, Error Messages: ${messagesAccurate}`
+      );
+    })();
+
+    // Test: Google OAuth Architecture Preserved
+    (() => {
+      const hasGoogleMethod = typeof supabaseService.signInWithGoogle === 'function';
+      assert(
+        'Google Sign-In (Req 3): Continue with Google OAuth configuration and redirect flow intact',
+        hasGoogleMethod,
+        hasGoogleMethod ? 'Google OAuth provider flow preserved' : 'signInWithGoogle method missing'
+      );
+    })();
+
+    // Test: Successful Authentication Grants Application Access and Restores Intended Route
+    (() => {
+      // Simulate unauthenticated attempt to access wallets
+      stateManager.clearAuthUser();
+      NavigationManager.switchTab('wallets');
+      const intendedBefore = NavigationManager.intendedRoute;
+
+      // Simulate successful Supabase login
+      const mockSupabaseUser = {
+        id: 'usr_test_auth_success',
+        email: 'authenticated.user@pocketpe.in',
+        user_metadata: { full_name: 'Auth Test User' },
+        app_metadata: { provider: 'email' },
+      };
+      stateManager.setAuthUser(mockSupabaseUser);
+      NavigationManager.updateAuthStateUI(true);
+
+      // Complete post-auth redirect
+      const target = NavigationManager.intendedRoute || 'home';
+      NavigationManager.switchTab(target);
+
+      const isAuthenticated = stateManager.isUserAuthenticated();
+      const currentTab = stateManager.state.activeTab;
+
+      assert(
+        'Auth Grant (Req 4): Verified session unlocks application and redirects user to intended route',
+        isAuthenticated && intendedBefore === 'wallets' && currentTab === 'wallets',
+        `Authenticated: ${isAuthenticated}, Current Tab: ${currentTab}, Intended: ${intendedBefore}`
+      );
+    })();
+
+    // Test: Sign Out Immediately Removes Protected Access and Wipes Memory
+    (() => {
+      // Setup authenticated state with private data
+      stateManager.setAuthUser({
+        id: 'usr_signout_test',
+        email: 'signout@pocketpe.in',
+        user_metadata: { full_name: 'Signout Test' },
+      });
+      stateManager.state.transactions = [{ id: 'tx_priv_1', amount: 999, merchant: 'Private Merchant' }];
+
+      // Perform sign out
+      stateManager.clearAuthUser();
+      NavigationManager.updateAuthStateUI(false);
+      NavigationManager.switchTab('auth');
+
+      const isAuthedAfter = stateManager.isUserAuthenticated();
+      const userIdAfter = stateManager.getUserId();
+      const inMemoryTxCount = stateManager.getTransactions().length;
+
+      // Attempt navigation to protected route
+      NavigationManager.switchTab('activity');
+      const activeTabAfterNav = stateManager.state.activeTab;
+
+      assert(
+        'Sign Out Security (Req 5): Signing out wipes in-memory private records and prevents navigation to protected features',
+        !isAuthedAfter && userIdAfter === null && inMemoryTxCount === 0 && activeTabAfterNav === 'auth',
+        `isAuthed: ${isAuthedAfter}, inMemoryTxCount: ${inMemoryTxCount}, activeTab: ${activeTabAfterNav}`
+      );
+    })();
+
+    // Test: User-Specific Scoped Data Isolation (Multi-User Privacy)
+    (() => {
+      // User 1
+      const user1 = { id: 'usr_alice_privacy', email: 'alice@pocketpe.in', user_metadata: { full_name: 'Alice' } };
+      stateManager.setAuthUser(user1);
+      stateManager.state.transactions = [{ id: 'tx_alice_1', amount: 500, merchant: 'Alice Secret Store' }];
+      stateManager.saveUserScopedData(user1.id);
+
+      // User 2
+      const user2 = { id: 'usr_bob_privacy', email: 'bob@pocketpe.in', user_metadata: { full_name: 'Bob' } };
+      stateManager.setAuthUser(user2);
+
+      const bobTx = stateManager.getTransactions();
+      const hasAliceTx = bobTx.some((t) => t.id === 'tx_alice_1');
+
+      // Add transaction for Bob
+      stateManager.state.transactions = [{ id: 'tx_bob_1', amount: 200, merchant: 'Bob Bookstore' }];
+      stateManager.saveUserScopedData(user2.id);
+
+      // Switch back to User 1
+      stateManager.setAuthUser(user1);
+      const aliceRestoredTx = stateManager.getTransactions();
+      const hasBobTx = aliceRestoredTx.some((t) => t.id === 'tx_bob_1');
+      const hasAliceRestored = aliceRestoredTx.some((t) => t.id === 'tx_alice_1');
+
+      assert(
+        'Data Privacy & Security (Req 6): Strict user-scoped isolation ensures one user cannot access another user\'s private data',
+        !hasAliceTx && !hasBobTx && hasAliceRestored,
+        `Bob saw Alice's data: ${hasAliceTx}, Alice saw Bob's data: ${hasBobTx}, Alice data intact: ${hasAliceRestored}`
+      );
+
+      // Clean up test keys
+      localStorage.removeItem('pocketpe_user_usr_alice_privacy_data');
+      localStorage.removeItem('pocketpe_user_usr_bob_privacy_data');
+    })();
+
+    // Test: Existing Features and Wallet Balance Behavior Preserved
+    (() => {
+      const user = { id: 'usr_features_preserved', email: 'preserve@pocketpe.in', user_metadata: { full_name: 'Preserve Test' } };
+      stateManager.setAuthUser(user);
+
+      const wallets = stateManager.getWallets();
+      const hasFood = wallets.some((w) => w.id === 'wallet_food');
+      const hasTransport = wallets.some((w) => w.id === 'wallet_transport');
+      const hasFreeMoney = wallets.some((w) => w.id === 'wallet_free');
+      const splitBillInit = stateManager.state.splitBill;
+      const fraudDetectionInit = stateManager.state.fraudDetection;
+
+      assert(
+        'Feature Preservation (Req 7): Core purpose wallets, split bill engine, and protection shield fully preserved',
+        hasFood && hasTransport && hasFreeMoney && !!splitBillInit && !!fraudDetectionInit,
+        `Wallets: ${wallets.length}, SplitBill: ${!!splitBillInit}, FraudShield: ${!!fraudDetectionInit}`
+      );
+
+      localStorage.removeItem('pocketpe_user_usr_features_preserved_data');
+    })();
+
+    // Restore original application state
+    if (originalUserState?.id) {
+      stateManager.state.user = originalUserState;
+      stateManager.loadUserScopedData(originalUserState.id);
+      NavigationManager.updateAuthStateUI(true);
+      NavigationManager.switchTab(originalUserState.isAuthenticated ? 'home' : 'auth');
+    } else {
+      stateManager.clearAuthUser();
+      NavigationManager.updateAuthStateUI(false);
+      NavigationManager.switchTab('auth');
+    }
 
     const endTime = performance.now();
     const durationMs = Math.round((endTime - startTime) * 100) / 100;

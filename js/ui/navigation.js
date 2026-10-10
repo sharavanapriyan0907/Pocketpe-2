@@ -6,10 +6,34 @@ import { stateManager } from '../state.js';
 import { SoundEngine } from './sound.js';
 
 export class NavigationManager {
+  static intendedRoute = 'home';
+  static PROTECTED_ROUTES = new Set(['home', 'wallets', 'pay', 'activity', 'profile', 'split']);
+
+  static isProtectedRoute(tabId) {
+    return this.PROTECTED_ROUTES.has(tabId);
+  }
+
   static init() {
     this.setupTabNavigation();
     this.setupModalDismissals();
     this.setupStatusBarClock();
+    this.setupHashRouting();
+  }
+
+  static setupHashRouting() {
+    // Check initial hash in URL
+    const initialHash = window.location.hash.replace(/^#/, '').trim();
+    if (initialHash && this.isProtectedRoute(initialHash)) {
+      this.intendedRoute = initialHash;
+    }
+
+    // Intercept address bar hash changes
+    window.addEventListener('hashchange', () => {
+      const target = window.location.hash.replace(/^#/, '').trim();
+      if (target) {
+        this.switchTab(target);
+      }
+    });
   }
 
   static setupTabNavigation() {
@@ -25,12 +49,23 @@ export class NavigationManager {
   }
 
   static switchTab(tabId) {
+    const isAuth = stateManager.isUserAuthenticated();
+
+    // Centralized Route Guard: Unauthenticated users are redirected to login
+    if (this.isProtectedRoute(tabId) && !isAuth) {
+      this.intendedRoute = tabId;
+      tabId = 'auth';
+    } else if (tabId === 'auth' && isAuth) {
+      // Authenticated users are redirected away from login to intended or home
+      tabId = (this.intendedRoute && this.intendedRoute !== 'auth') ? this.intendedRoute : 'home';
+    }
+
     stateManager.state.activeTab = tabId;
 
     // Update bottom nav bar items
     const navItems = document.querySelectorAll('[data-nav-target]');
     navItems.forEach((item) => {
-      if (item.getAttribute('data-nav-target') === tabId) {
+      if (tabId !== 'auth' && item.getAttribute('data-nav-target') === tabId) {
         item.classList.add('active');
         item.setAttribute('aria-selected', 'true');
       } else {
@@ -49,6 +84,11 @@ export class NavigationManager {
       }
     });
 
+    // Sync address bar URL hash
+    if (window.location.hash !== `#${tabId}`) {
+      window.history.replaceState(null, '', `#${tabId}`);
+    }
+
     // Scroll container to top
     const phoneScreen = document.querySelector('.phone-screen');
     if (phoneScreen) {
@@ -57,6 +97,28 @@ export class NavigationManager {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 
     stateManager.notify('tab:switched', tabId);
+  }
+
+  static updateAuthStateUI(isAuth) {
+    if (isAuth) {
+      document.body.classList.remove('unauthenticated');
+      const authBtn = document.getElementById('btn-desktop-auth');
+      const labelDesktopAuth = document.getElementById('label-desktop-auth');
+      if (authBtn && labelDesktopAuth) {
+        const user = stateManager.getState().user;
+        const shortName = (user?.name || user?.email?.split('@')[0] || 'Account').split(' ')[0];
+        authBtn.classList.add('active');
+        labelDesktopAuth.textContent = shortName;
+      }
+    } else {
+      document.body.classList.add('unauthenticated');
+      const authBtn = document.getElementById('btn-desktop-auth');
+      const labelDesktopAuth = document.getElementById('label-desktop-auth');
+      if (authBtn && labelDesktopAuth) {
+        authBtn.classList.remove('active');
+        labelDesktopAuth.textContent = 'Sign In';
+      }
+    }
   }
 
   static setupModalDismissals() {
@@ -89,6 +151,15 @@ export class NavigationManager {
   }
 
   static openModal(modalId) {
+    const isAuth = stateManager.isUserAuthenticated();
+    const publicModals = ['modal-auth', 'modal-supabase-config'];
+
+    if (!publicModals.includes(modalId) && !isAuth) {
+      this.switchTab('auth');
+      this.showToast('Please sign in to access this feature', 'warning');
+      return;
+    }
+
     const modal = document.getElementById(modalId);
     if (modal) {
       modal.classList.add('active');

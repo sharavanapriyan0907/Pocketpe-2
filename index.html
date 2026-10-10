@@ -18,8 +18,7 @@
   <link rel="stylesheet" href="./css/phone-frame.css" />
   <link rel="stylesheet" href="./css/components.css" />
   <link rel="stylesheet" href="./css/views.css" />
-</head>
-<body>
+<body class="unauthenticated">
   <div class="desktop-stage">
     <!-- Desktop Presentation Bar -->
     <header class="desktop-header">
@@ -104,11 +103,21 @@
 
         <!-- Phone Scrollable Screen Content -->
         <div class="phone-screen" id="phone-screen-container">
+          <!-- Session Restoration Loading Overlay -->
+          <div id="app-auth-loading" aria-label="Initializing Secure Session">
+            <div class="auth-loading-logo">₹</div>
+            <div class="auth-loading-spinner"></div>
+            <div class="auth-loading-text">Securing session...</div>
+          </div>
+
           <!-- Floating Toast Container -->
           <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
+          <!-- 0. MANDATORY AUTHENTICATION VIEW (Entry Point for Signed-Out Users) -->
+          <section class="view-screen active" id="view-auth" aria-label="Sign In"></section>
+
           <!-- 1. HOME TAB VIEW -->
-          <section class="view-screen active" id="view-home" aria-label="Home"></section>
+          <section class="view-screen" id="view-home" aria-label="Home"></section>
 
           <!-- 2. WALLETS TAB VIEW -->
           <section class="view-screen" id="view-wallets" aria-label="Wallets"></section>

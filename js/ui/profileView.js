@@ -360,13 +360,15 @@ export class ProfileView {
           try {
             await supabaseService.signOut();
             stateManager.clearAuthUser();
+            NavigationManager.updateAuthStateUI(false);
+            NavigationManager.switchTab('auth');
             SoundEngine.playSuccess();
             NavigationManager.showToast('Logged out successfully', 'info');
-            this.render();
           } catch (e) {
             console.error('Logout error:', e);
             stateManager.clearAuthUser();
-            this.render();
+            NavigationManager.updateAuthStateUI(false);
+            NavigationManager.switchTab('auth');
           }
         }
       });
