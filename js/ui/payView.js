@@ -98,8 +98,11 @@ export class PayView {
     }
 
     this.container.innerHTML = `
-      <div class="section-header">
-        <h2 class="h2">Scan & Pay</h2>
+      <div class="section-header" style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button class="btn-header-back" data-back-nav aria-label="Return to Home">← Home</button>
+          <h2 class="h2" style="margin: 0;">Scan & Pay</h2>
+        </div>
         <span class="badge badge-success" style="font-size: 0.65rem;">● UPI 2.0 Ready</span>
       </div>
 

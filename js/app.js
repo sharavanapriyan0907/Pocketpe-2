@@ -7,6 +7,7 @@ import { ThemeManager } from './ui/theme.js';
 import { SoundEngine } from './ui/sound.js';
 import { NavigationManager } from './ui/navigation.js';
 import { HomeView } from './ui/homeView.js';
+import { BalanceView } from './ui/balanceView.js';
 import { WalletsView } from './ui/walletsView.js';
 import { PayView } from './ui/payView.js';
 import { ActivityView } from './ui/activityView.js';
@@ -57,6 +58,7 @@ class App {
 
     // 4. Initialize Tab Views
     safeInit('HomeView', () => HomeView.init());
+    safeInit('BalanceView', () => BalanceView.init());
     safeInit('WalletsView', () => WalletsView.init());
     safeInit('PayView', () => PayView.init());
     safeInit('ActivityView', () => ActivityView.init());

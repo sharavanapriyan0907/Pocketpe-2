@@ -108,15 +108,19 @@
   gap: 16px;
   position: relative;
   overflow: hidden;
+  box-sizing: border-box;
+  max-width: 100%;
+  contain: paint;
 }
 
 .balance-hero-card::after {
   content: '';
   position: absolute;
-  top: -50px;
-  right: -50px;
+  top: 0;
+  right: 0;
   width: 140px;
   height: 140px;
+  transform: translate(35%, -35%);
   border-radius: 50%;
   background: radial-gradient(circle, var(--accent-light) 0%, rgba(0,0,0,0) 70%);
   pointer-events: none;
@@ -1460,6 +1464,24 @@ body.unauthenticated .phone-home-indicator {
   padding: 16px 12px 32px;
   display: flex;
   flex-direction: column;
+}
+
+/* Mobile Small Screens Responsive Enhancements (<= 480px) */
+@media (max-width: 480px) {
+  .balance-hero-card {
+    padding: 16px 14px;
+    gap: 12px;
+  }
+  .balance-amount-display {
+    font-size: clamp(1.8rem, 7.5vw, 2.3rem);
+  }
+  .balance-stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px !important;
+  }
+  .balance-stats-grid .card {
+    padding: 10px 8px !important;
+  }
 }
 
 

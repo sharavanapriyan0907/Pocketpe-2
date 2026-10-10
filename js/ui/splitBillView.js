@@ -11,11 +11,17 @@ import { SoundEngine } from './sound.js';
 import { PayView } from './payView.js';
 
 export class SplitBillView {
+  static modal = null;
+  static container = null;
+  static selectedGroupId = null;
+
   static init() {
     this.modal = document.getElementById('modal-split-bill');
+    this.container = document.getElementById('view-split');
     this.selectedGroupId = null;
 
     this.setupListeners();
+    this.render();
   }
 
   static open(groupId = null) {
@@ -32,9 +38,78 @@ export class SplitBillView {
     });
     stateManager.subscribe('split:expense_added', () => this.render());
     stateManager.subscribe('split:settled', () => this.render());
+    stateManager.subscribe('tab:switched', (tabId) => {
+      if (tabId === 'split') {
+        this.render();
+      }
+    });
   }
 
   static render() {
+    this.renderModal();
+    this.renderContainer();
+  }
+
+  static renderContainer() {
+    if (!this.container) return;
+
+    const groups = stateManager.getSplitGroups();
+    if (!this.selectedGroupId && groups.length > 0) {
+      this.selectedGroupId = groups[0].id;
+    }
+    const currentGroup = groups.find((g) => g.id === this.selectedGroupId) || groups[0];
+
+    const headerHTML = `
+      <div class="view-header-row" style="display: flex; align-items: center; justify-content: space-between; padding-top: 4px; margin-bottom: 8px;">
+        <button class="btn-header-back" data-back-nav style="background: none; border: none; color: var(--accent-primary); font-size: 0.88rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 4px; padding: 6px 0;">
+          <span style="font-size: 1.1rem; line-height: 1;">←</span> Home
+        </button>
+        <h2 class="h2" style="font-size: 1.1rem; font-weight: 800; color: var(--text-primary); margin: 0;">
+          Split Bills
+        </h2>
+        <button class="btn btn-sm btn-secondary" id="btn-split-screen-new-group" style="width: auto; padding: 4px 10px; font-size: 0.75rem;">
+          + New
+        </button>
+      </div>
+    `;
+
+    if (!currentGroup) {
+      this.container.innerHTML = `
+        ${headerHTML}
+        <div style="text-align: center; padding: 40px 20px; background: var(--bg-surface); border-radius: var(--radius-xl); border: 1px dashed var(--border-strong); margin-top: 10px;">
+          <div style="font-size: 2.5rem; margin-bottom: 8px;">👥</div>
+          <h3 class="h3">No Split Groups Yet</h3>
+          <p class="subtitle">Create a group with your roommates or friends to track shared expenses.</p>
+          <button class="btn btn-primary" id="btn-create-first-group-screen" style="margin-top: 16px;">
+            + Create Split Group
+          </button>
+        </div>
+      `;
+      const btn = this.container.querySelector('#btn-create-first-group-screen');
+      if (btn) btn.addEventListener('click', () => this.openCreateGroupModal());
+      const newBtn = this.container.querySelector('#btn-split-screen-new-group');
+      if (newBtn) newBtn.addEventListener('click', () => this.openCreateGroupModal());
+      return;
+    }
+
+    const members = stateManager.getGroupMembers(currentGroup.id);
+    const expenses = stateManager.getGroupExpenses(currentGroup.id);
+    const balances = SplitEngine.calculateGroupBalances(currentGroup.id);
+    const settlements = SplitEngine.calculateSimplifiedSettlements(currentGroup.id);
+    const currentUserMember = members.find((m) => m.isCurrentUser);
+    const userNet = currentUserMember && balances[currentUserMember.id] ? balances[currentUserMember.id].netBalance : 0;
+
+    this.container.innerHTML = `
+      ${headerHTML}
+      ${this.buildBodyContent(currentGroup, groups, members, expenses, balances, settlements, userNet)}
+    `;
+
+    this.bindGroupEvents(this.container, currentGroup);
+    const newBtn = this.container.querySelector('#btn-split-screen-new-group');
+    if (newBtn) newBtn.addEventListener('click', () => this.openCreateGroupModal());
+  }
+
+  static renderModal() {
     const modal = document.getElementById('modal-split-bill');
     if (!modal) return;
 
@@ -70,12 +145,17 @@ export class SplitBillView {
     const expenses = stateManager.getGroupExpenses(currentGroup.id);
     const balances = SplitEngine.calculateGroupBalances(currentGroup.id);
     const settlements = SplitEngine.calculateSimplifiedSettlements(currentGroup.id);
-
-    // Current user's net position
     const currentUserMember = members.find((m) => m.isCurrentUser);
     const userNet = currentUserMember && balances[currentUserMember.id] ? balances[currentUserMember.id].netBalance : 0;
 
-    body.innerHTML = `
+    body.innerHTML = this.buildBodyContent(currentGroup, groups, members, expenses, balances, settlements, userNet);
+    footer.innerHTML = `<button class="btn btn-secondary" data-close-modal="modal-split-bill">Close</button>`;
+
+    this.bindGroupEvents(body, currentGroup);
+  }
+
+  static buildBodyContent(currentGroup, groups, members, expenses, balances, settlements, userNet) {
+    return `
       <!-- Top Group Switcher Pill Carousel -->
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
         <div class="group-switcher-scroll" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; max-width: 80%;">
@@ -264,13 +344,13 @@ export class SplitBillView {
         </p>
       </div>
     `;
+  }
 
-    footer.innerHTML = `
-      <button class="btn btn-secondary" data-close-modal="modal-split-bill">Close</button>
-    `;
+  static bindGroupEvents(rootEl, currentGroup) {
+    if (!rootEl) return;
 
     // Group switcher pills
-    body.querySelectorAll('[data-switch-group]').forEach((btn) => {
+    rootEl.querySelectorAll('[data-switch-group]').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.selectedGroupId = btn.getAttribute('data-switch-group');
         SoundEngine.playTap();
@@ -279,19 +359,19 @@ export class SplitBillView {
     });
 
     // New Group button
-    const newGroupBtn = body.querySelector('#btn-open-new-group-modal');
+    const newGroupBtn = rootEl.querySelector('#btn-open-new-group-modal');
     if (newGroupBtn) {
       newGroupBtn.addEventListener('click', () => this.openCreateGroupModal());
     }
 
     // Add Expense button
-    const addExpenseBtn = body.querySelector('#btn-open-add-expense');
+    const addExpenseBtn = rootEl.querySelector('#btn-open-add-expense');
     if (addExpenseBtn) {
       addExpenseBtn.addEventListener('click', () => this.openAddExpenseModal(currentGroup));
     }
 
     // Settle Up Action
-    body.querySelectorAll('[data-settle-action]').forEach((btn) => {
+    rootEl.querySelectorAll('[data-settle-action]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const grpId = btn.getAttribute('data-settle-action');
         const fromId = btn.getAttribute('data-from');
@@ -322,7 +402,7 @@ export class SplitBillView {
     });
 
     // Gentle Reminder Action
-    body.querySelectorAll('[data-remind-action]').forEach((btn) => {
+    rootEl.querySelectorAll('[data-remind-action]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const friendName = btn.getAttribute('data-remind-action');
         const amt = btn.getAttribute('data-amt');

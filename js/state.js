@@ -416,6 +416,10 @@ class StateManager {
   }
 
   // --- Privacy Toggle ---
+  isBalanceHidden() {
+    return !!this.state.isBalanceHidden;
+  }
+
   toggleBalancePrivacy() {
     this.state.isBalanceHidden = !this.state.isBalanceHidden;
     this.notify('privacy:toggled', this.state.isBalanceHidden);

@@ -36,9 +36,17 @@
           <span class="desktop-nav-icon">🏠</span>
           <span>Home</span>
         </button>
+        <button class="desktop-nav-item" data-nav-target="balance">
+          <span class="desktop-nav-icon">💰</span>
+          <span>Balance</span>
+        </button>
         <button class="desktop-nav-item" data-nav-target="wallets">
           <span class="desktop-nav-icon">💼</span>
           <span>Wallets</span>
+        </button>
+        <button class="desktop-nav-item" data-nav-target="split">
+          <span class="desktop-nav-icon">👥</span>
+          <span>Split Bills</span>
         </button>
         <button class="desktop-nav-item desktop-nav-pay" data-nav-target="pay">
           <span class="desktop-nav-icon">⚡</span>
@@ -46,11 +54,11 @@
         </button>
         <button class="desktop-nav-item" data-nav-target="activity">
           <span class="desktop-nav-icon">📋</span>
-          <span>Activity</span>
+          <span>History</span>
         </button>
         <button class="desktop-nav-item" data-nav-target="profile">
-          <span class="desktop-nav-icon">⚙️</span>
-          <span>Settings</span>
+          <span class="desktop-nav-icon">👤</span>
+          <span>Profile</span>
         </button>
       </nav>
 
@@ -119,16 +127,22 @@
           <!-- 1. HOME TAB VIEW -->
           <section class="view-screen" id="view-home" aria-label="Home"></section>
 
-          <!-- 2. WALLETS TAB VIEW -->
+          <!-- 2. BALANCE TAB VIEW -->
+          <section class="view-screen" id="view-balance" aria-label="My Balance"></section>
+
+          <!-- 3. WALLETS TAB VIEW -->
           <section class="view-screen" id="view-wallets" aria-label="Wallets"></section>
 
-          <!-- 3. PAY TAB VIEW -->
+          <!-- 4. SPLIT BILLS TAB VIEW -->
+          <section class="view-screen" id="view-split" aria-label="Split Bills"></section>
+
+          <!-- 5. PAY TAB VIEW -->
           <section class="view-screen" id="view-pay" aria-label="Scan & Pay"></section>
 
-          <!-- 4. ACTIVITY TAB VIEW -->
+          <!-- 6. ACTIVITY TAB VIEW -->
           <section class="view-screen" id="view-activity" aria-label="Activity"></section>
 
-          <!-- 5. PROFILE & SETTINGS TAB VIEW -->
+          <!-- 7. PROFILE & SETTINGS TAB VIEW -->
           <section class="view-screen" id="view-profile" aria-label="Profile and Settings"></section>
 
           <!-- =============================================================
@@ -140,7 +154,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Confirm Payment">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Payment Recommendation</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Payment Recommendation</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-confirm-payment" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -153,7 +170,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Payment Protection Shield">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Protection Shield</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Protection Shield</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-payment-protection" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -166,7 +186,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Create New Purpose Wallet">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Create Wallet</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Create Wallet</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-create-wallet" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -179,7 +202,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Wallet Details">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Wallet Overview</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Wallet Overview</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-wallet-detail" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -194,7 +220,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Configure Automatic Money Split">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Automatic Split Rules</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Automatic Split Rules</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-split-rules" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -207,7 +236,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Receive Funds via UPI">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title" id="title-receive-modal">Receive Money</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title" id="title-receive-modal">Receive Money</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-receive-money" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -220,7 +252,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Transfer Money Between Wallets">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title" id="title-move-modal">Transfer Between Wallets</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title" id="title-move-modal">Transfer Between Wallets</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-move-money" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -233,7 +268,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Transaction Receipt">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Payment Receipt</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Payment Receipt</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-transaction-receipt" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -246,7 +284,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Enter Custom Merchant or UPI">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Custom Pay</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Custom Pay</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-custom-merchant" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -258,6 +299,13 @@
           <div class="modal-overlay" id="modal-onboarding" aria-hidden="true">
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="PocketPe Tour">
               <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">PocketPe Tour</h3>
+                </div>
+                <button class="sheet-close-btn" data-close-modal="modal-onboarding" aria-label="Close">✕</button>
+              </div>
               <div class="sheet-body"></div>
               <div class="sheet-footer"></div>
             </div>
@@ -268,7 +316,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Report Suspicious UPI ID">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Report UPI ID</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Report UPI ID</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-report-upi" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -281,7 +332,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Community Risk Details">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Trust & Spam Score</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Trust & Spam Score</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-upi-risk-detail" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -294,7 +348,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="High-Risk Warning">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title" style="color: var(--danger);">Security Warning</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title" style="color: var(--danger);">Security Warning</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-high-risk-warning" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -307,7 +364,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Incoming Money Requests">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Incoming Requests</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Incoming Requests</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-collect-requests" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -320,7 +380,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Split-Bill Wallet">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Split-Bill Wallet</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Split-Bill Wallet</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-split-bill" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -333,7 +396,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Create Split Group">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">New Group</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">New Group</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-create-group" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -346,7 +412,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Add Shared Expense">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Add Expense</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Add Expense</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-add-expense" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -361,21 +430,25 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="PocketPe Account">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">PocketPe Account</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">PocketPe Account</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-auth" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
             </div>
           </div>
 
-
-
           <!-- Edit Profile Modal -->
           <div class="modal-overlay" id="modal-edit-profile" aria-hidden="true">
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Edit Profile">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Edit Profile</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Edit Profile</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-edit-profile" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -388,7 +461,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Add Payment Commitment">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Add Payment</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Add Payment</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-add-commitment" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -401,7 +477,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Payment Details">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Payment Overview</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Payment Overview</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-view-commitment" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -414,7 +493,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Change Purpose Wallet">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Change Preferred Wallet</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Change Preferred Wallet</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-change-wallet" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -427,7 +509,10 @@
             <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Add Money to Wallet">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Add Money</h3>
+                <div class="sheet-header-left">
+                  <button class="sheet-back-btn" data-back-nav aria-label="Go Back">←</button>
+                  <h3 class="sheet-title">Add Money</h3>
+                </div>
                 <button class="sheet-close-btn" data-close-modal="modal-funding-action" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -449,27 +534,31 @@
           </div>
         </div>
 
-        <!-- 5-Section Bottom Navigation Bar -->
+        <!-- 6-Section Mobile Bottom Navigation Bar -->
         <nav class="bottom-nav" aria-label="Primary Navigation">
-          <a href="#home" class="nav-item active" data-nav-target="home" aria-label="Home tab">
+          <a href="#home" class="nav-item active" data-nav-target="home" data-tab="home" aria-label="Home tab">
             <div class="nav-icon">🏠</div>
             <span>Home</span>
           </a>
-          <a href="#wallets" class="nav-item" data-nav-target="wallets" aria-label="Wallets tab">
+          <a href="#balance" class="nav-item" data-nav-target="balance" data-tab="balance" aria-label="Balance tab">
+            <div class="nav-icon">💰</div>
+            <span>Balance</span>
+          </a>
+          <a href="#wallets" class="nav-item" data-nav-target="wallets" data-tab="wallets" aria-label="Wallets tab">
             <div class="nav-icon">💼</div>
             <span>Wallets</span>
           </a>
-          <a href="#pay" class="nav-item nav-pay" data-nav-target="pay" aria-label="Scan and Pay">
-            <div class="pay-bubble">⚡</div>
-            <span>Pay</span>
+          <a href="#split" class="nav-item" data-nav-target="split" data-tab="split" aria-label="Split Bills tab">
+            <div class="nav-icon">👥</div>
+            <span>Split Bills</span>
           </a>
-          <a href="#activity" class="nav-item" data-nav-target="activity" aria-label="Activity history tab">
+          <a href="#activity" class="nav-item" data-nav-target="activity" data-tab="activity" aria-label="Transaction History tab">
             <div class="nav-icon">📋</div>
-            <span>Activity</span>
+            <span>History</span>
           </a>
-          <a href="#profile" class="nav-item" data-nav-target="profile" aria-label="Profile and Settings tab">
-            <div class="nav-icon">⚙️</div>
-            <span>Settings</span>
+          <a href="#profile" class="nav-item" data-nav-target="profile" data-tab="profile" aria-label="Profile and Settings tab">
+            <div class="nav-icon">👤</div>
+            <span>Profile</span>
           </a>
         </nav>
 

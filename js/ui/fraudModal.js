@@ -380,7 +380,7 @@ export class FraudModal {
     const overviewReportBtn = body.querySelector('#btn-overview-file-report');
     if (overviewReportBtn) {
       overviewReportBtn.addEventListener('click', () => {
-        NavigationManager.closeModal('modal-upi-risk-detail');
+        NavigationManager.closeModal('modal-upi-risk-detail', { withoutHistory: true });
         this.openReportModal('');
       });
     }
@@ -406,7 +406,7 @@ export class FraudModal {
     const repBtn = footer.querySelector('#btn-open-report-from-detail');
     if (repBtn) {
       repBtn.addEventListener('click', () => {
-        NavigationManager.closeModal('modal-upi-risk-detail');
+        NavigationManager.closeModal('modal-upi-risk-detail', { withoutHistory: true });
         this.openReportModal(targetUpi, displayName);
       });
     }

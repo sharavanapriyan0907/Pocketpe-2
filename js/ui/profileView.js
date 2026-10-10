@@ -67,8 +67,9 @@ export class ProfileView {
       .trim();
 
     this.container.innerHTML = `
-      <div class="section-header">
-        <h2 class="h2">Profile & Settings</h2>
+      <div class="section-header" style="display: flex; align-items: center; justify-content: flex-start; gap: 8px;">
+        <button class="btn-header-back" data-back-nav aria-label="Return to Home">← Home</button>
+        <h2 class="h2" style="margin: 0;">Profile & Settings</h2>
       </div>
 
       <div class="profile-responsive-grid">
