@@ -12,6 +12,7 @@ import { WalletEngine } from '../engines/walletEngine.js';
 import { TransactionEngine } from '../engines/transactionEngine.js';
 import { FraudEngine, RISK_LEVELS } from '../engines/fraudEngine.js';
 import { UpiQrEngine, parseUpiQr, getCategoryFromMcc, getPocketPeCategory, getWalletForCategory, MCC_CATEGORY_MAP } from '../engines/upiQrEngine.js';
+import { MlCategoryEngine } from '../engines/mlCategoryEngine.js';
 import { supabaseService } from '../services/supabaseService.js';
 import { FraudModal } from './fraudModal.js';
 import { NavigationManager } from './navigation.js';
@@ -552,14 +553,16 @@ export class PayView {
     const pn = upiResult.pn || pa.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
     const mc = upiResult.mc || null;
     const amount = upiResult.amount || null;
+    const note = upiResult.tn || null;
 
-    // STEP 10: Strict Decision Tree Execution
+    // STEP 10: Strict Decision Tree Execution with Planned ML Fallback
     await this.processUpiPaymentDecision({
       rawPayload,
       pa,
       pn,
       mc,
       amount,
+      note,
     });
   }
 
@@ -570,9 +573,12 @@ export class PayView {
    * NO: Check merchant_preferences by user_id + upi_id
    *     Previous wallet?
    *       YES: Suggest it ("Based on your previous choice.")
-   *       NO: Ask user "Where should payments to {Name} go?", save choice, then proceed.
+   *       NO: PLANNED MACHINE-LEARNING FALLBACK:
+   *           - Predict category from payee name, VPA, amount, and note
+   *           - High confidence (>= 80%): Suggest with AI Smart badge
+   *           - Uncertain (< 80%): Request explicit user confirmation
    */
-  static async processUpiPaymentDecision({ rawPayload, pa, pn, mc, amount = null }) {
+  static async processUpiPaymentDecision({ rawPayload, pa, pn, mc, amount = null, note = null }) {
     const userId = stateManager.getUserId();
     const allWallets = stateManager.getWallets();
 
@@ -639,7 +645,7 @@ export class PayView {
     const isUnknownMcc = mc && mc !== '0000' && mc !== '0';
 
     if (isUnknownMcc) {
-      // Check if user previously saved a wallet preference for this merchant
+      // 1. Check if user previously saved a wallet preference for this merchant
       const existingPref = await supabaseService.getMerchantPreference(userId, pa);
       if (existingPref && existingPref.walletId) {
         const savedWallet = allWallets.find((w) => w.id === existingPref.walletId) || stateManager.getWallet(existingPref.walletId);
@@ -671,40 +677,63 @@ export class PayView {
         }
       }
 
-      // STEP 9: Unknown Merchant Category
-      console.log('🔍 [PocketPe Dev QR Scan]', {
+      // 2. Machine-Learning Fallback for Unknown MCC
+      const mlPrediction = MlCategoryEngine.predict({
+        merchantName: pn,
+        upiId: pa,
+        amount,
+        note,
+        mcc: mc,
+      });
+
+      console.log('🤖 [PocketPe ML Fallback - Unknown MCC]', {
         'raw QR detected': rawPayload,
         'is UPI': true,
         pa,
         pn,
         mc,
         amount: amount || 'Not specified',
-        'detected category': 'Unknown MCC',
-        'suggested wallet': 'None',
-        source: 'unknown_mcc',
+        note: note || 'None',
+        prediction: mlPrediction,
       });
 
-      this.showWalletSelectionPrompt({
+      // High confidence prediction (>= 80% without ambiguity)
+      if (!mlPrediction.isUncertain && mlPrediction.recommendedWallet) {
+        this.showSuggestedWalletModal({
+          merchantName: pn,
+          upiId: pa,
+          mcc: mc,
+          category: mlPrediction.category,
+          icon: mlPrediction.icon,
+          suggestedWallet: mlPrediction.recommendedWallet,
+          reason: mlPrediction.reason,
+          amount,
+          isPersonal: false,
+          aiConfidence: mlPrediction.confidencePercent,
+          mlPrediction,
+        });
+        return;
+      }
+
+      // Uncertain prediction (< 80% or close margin) -> Prompt user for confirmation
+      this.showUncertainPredictionConfirmationModal({
         merchantName: pn,
         upiId: pa,
         mcc: mc,
-        category: 'Merchant',
-        icon: '🏪',
         amount,
-        promptText: 'Merchant category not recognized.',
+        note,
         isPersonal: false,
-        isFirstTime: true,
-        askRemember: true,
+        prediction: mlPrediction,
       });
       return;
     }
 
-    // DECISION BRANCH 3: Personal QR (mc missing or "0000")
-    // STEP 5: Personal QR fallback - check merchant_preferences by user_id + upi_id
+    // DECISION BRANCH 3: Personal QR or Missing MCC (mc missing or "0000")
+    // 1. Check merchant_preferences by user_id + upi_id
     const userPref = await supabaseService.getMerchantPreference(userId, pa);
 
     if (userPref && userPref.walletId) {
-      // STEP 7: Returning Personal QR
+      // Returning payee with saved preference
       const savedWallet = allWallets.find((w) => w.id === userPref.walletId) || stateManager.getWallet(userPref.walletId);
       const cat = userPref.category || (savedWallet ? savedWallet.name : 'Friends & Social');
       const icon = savedWallet?.icon || '👥';
@@ -737,36 +766,61 @@ export class PayView {
       }
     }
 
-    // STEP 6: First-time Personal QR
-    console.log('🔍 [PocketPe Dev QR Scan]', {
+    // 2. Machine-Learning Fallback for Missing / Personal MCC
+    const mlPrediction = MlCategoryEngine.predict({
+      merchantName: pn,
+      upiId: pa,
+      amount,
+      note,
+      mcc: null,
+    });
+
+    console.log('🤖 [PocketPe ML Fallback - Missing MCC]', {
       'raw QR detected': rawPayload,
       'is UPI': true,
       pa,
       pn,
       mc: mc || 'None',
       amount: amount || 'Not specified',
-      'detected category': 'Friends & Social',
-      'suggested wallet': 'None',
-      source: 'first_time_personal',
+      note: note || 'None',
+      prediction: mlPrediction,
     });
 
-    this.showWalletSelectionPrompt({
+    const isPersonalGuess = mlPrediction.category === 'Friends & Social';
+
+    // High confidence prediction (>= 80% without ambiguity)
+    if (!mlPrediction.isUncertain && mlPrediction.recommendedWallet) {
+      this.showSuggestedWalletModal({
+        merchantName: pn,
+        upiId: pa,
+        mcc: mc,
+        category: mlPrediction.category,
+        icon: mlPrediction.icon,
+        suggestedWallet: mlPrediction.recommendedWallet,
+        reason: mlPrediction.reason,
+        amount,
+        isPersonal: isPersonalGuess,
+        aiConfidence: mlPrediction.confidencePercent,
+        mlPrediction,
+      });
+      return;
+    }
+
+    // Uncertain prediction (< 80% or close runner-up) -> Prompt user for confirmation
+    this.showUncertainPredictionConfirmationModal({
       merchantName: pn,
       upiId: pa,
       mcc: mc,
-      category: 'Friends & Social',
-      icon: '👥',
       amount,
-      promptText: `Where should payments to ${pn} go?`,
-      isPersonal: true,
-      isFirstTime: true,
-      askRemember: false,
+      note,
+      isPersonal: isPersonalGuess,
+      prediction: mlPrediction,
     });
   }
 
   /**
    * STEP 11: Render Simple Suggested Wallet UI
-   * Matches exact mockups for Merchant QR and Personal QR
+   * Matches exact mockups for Merchant QR and Personal QR, with Smart ML AI confidence badge when predicted.
    */
   static showSuggestedWalletModal({
     merchantName,
@@ -778,6 +832,8 @@ export class PayView {
     reason,
     amount = null,
     isPersonal = false,
+    aiConfidence = null,
+    mlPrediction = null,
   }) {
     const modal = document.getElementById('modal-confirm-payment');
     if (!modal) return;
@@ -802,10 +858,19 @@ export class PayView {
         ${
           category
             ? `
-          <div style="margin-top: 8px;">
+          <div style="margin-top: 8px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
             <span class="badge badge-accent" style="font-size: 0.78rem; padding: 4px 12px; border-radius: var(--radius-full);">
               ${icon} ${category}
             </span>
+            ${
+              aiConfidence
+                ? `
+              <span class="badge" style="font-size: 0.68rem; padding: 2px 8px; background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); border-radius: var(--radius-full); font-weight: 600;">
+                🤖 Categorized by Smart ML (${aiConfidence}% confidence)
+              </span>
+            `
+                : ''
+            }
           </div>
         `
             : ''
@@ -897,6 +962,11 @@ export class PayView {
         }
       }
 
+      // If categorized via ML, reinforce continuous learning
+      if (mlPrediction && category) {
+        MlCategoryEngine.learn({ merchantName, upiId, amount: finalAmt }, category);
+      }
+
       SoundEngine.playTap();
       this.initiatePaymentFlow({
         merchantName,
@@ -920,6 +990,255 @@ export class PayView {
         category,
         icon,
         amount: selectedAmount,
+        promptText: `Select wallet for ${merchantName}:`,
+        isPersonal,
+        isFirstTime: false,
+        askRemember: true,
+      });
+    });
+
+    NavigationManager.openModal('modal-confirm-payment');
+  }
+
+  /**
+   * STEP 10B: Render Uncertain ML Prediction Confirmation Modal
+   * Triggered when MCC is absent/unknown and ML prediction confidence is < 80% (or narrow margin).
+   * Prompts user for explicit confirmation before assigning/learning a category.
+   */
+  static showUncertainPredictionConfirmationModal({
+    merchantName,
+    upiId,
+    mcc = null,
+    amount = null,
+    note = null,
+    isPersonal = false,
+    prediction,
+  }) {
+    const modal = document.getElementById('modal-confirm-payment');
+    if (!modal) return;
+
+    const body = modal.querySelector('.sheet-body');
+    const footer = modal.querySelector('.sheet-footer');
+    if (!body || !footer) return;
+
+    const allWallets = stateManager.getWallets();
+    const userId = stateManager.getUserId();
+    const suggestedWallet = prediction?.recommendedWallet || stateManager.getFreeMoneyWallet();
+    const topCandidates = prediction?.topCandidates || [];
+    let selectedAmount = amount || (this.currentPaymentData?.amount || 0);
+
+    // Alternative runner-up candidate options (excluding the top prediction)
+    const runnerUps = topCandidates.slice(1, 3).filter((c) => c.category !== prediction.category);
+
+    body.innerHTML = `
+      <!-- Payee Info Header with Uncertainty Banner -->
+      <div style="text-align: center; margin-bottom: 14px;">
+        <div style="font-size: 2.6rem; margin-bottom: 4px;">${prediction?.icon || '🏪'}</div>
+        <h3 class="h3" style="color: var(--text-primary); text-transform: uppercase; font-size: 1.15rem; letter-spacing: 0.5px; margin: 0;">
+          ${merchantName}
+        </h3>
+        <p class="mono" style="color: var(--text-muted); font-size: 0.76rem; margin-top: 3px;">
+          ${upiId}
+        </p>
+
+        <div style="margin-top: 8px;">
+          <span class="badge" style="background: rgba(245, 158, 11, 0.15); color: var(--warning, #f59e0b); border: 1.5px solid rgba(245, 158, 11, 0.35); font-size: 0.74rem; padding: 4px 12px; border-radius: var(--radius-full); font-weight: 700; display: inline-flex; align-items: center; gap: 5px;">
+            <span>⚠️ Prediction Needs Confirmation</span>
+            <span style="opacity: 0.85;">(${prediction.confidencePercent}% match)</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Machine Learning Context Card -->
+      <div class="card" style="padding: 14px; background: var(--bg-surface-secondary); border: 1.5px solid var(--border-subtle); border-radius: var(--radius-lg); margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+          <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">
+            AI Fallback Recommendation
+          </div>
+          <span class="badge" style="font-size: 0.65rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3);">
+            No MCC Found
+          </span>
+        </div>
+
+        <!-- Highlighted Best Prediction -->
+        <div class="card" id="btn-confirm-top-prediction" style="padding: 12px 14px; background: var(--bg-surface); border: 1.5px solid var(--accent-primary); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: all var(--transition-fast);">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 1.6rem;">${suggestedWallet.icon}</span>
+            <div>
+              <div style="font-weight: 700; font-size: var(--text-sm); color: var(--text-primary);">
+                ${prediction.category}
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">
+                Target: ${suggestedWallet.name} • ${WalletEngine.formatRupee(suggestedWallet.balance)}
+              </div>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <span class="badge badge-accent" style="font-size: 0.75rem; font-weight: 700; padding: 4px 8px;">
+              ${prediction.confidencePercent}% Match
+            </span>
+          </div>
+        </div>
+
+        <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 10px; line-height: 1.4;">
+          ${prediction.reason}
+        </div>
+      </div>
+
+      <!-- Alternative Runner-Up Suggestions -->
+      ${
+        runnerUps.length > 0
+          ? `
+        <div style="margin-bottom: 12px;">
+          <div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">
+            Or choose a likely alternative:
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;" id="ml-runnerup-container">
+            ${runnerUps
+              .map((cand) => {
+                const candWallet = (cand.walletId ? allWallets.find((w) => w.id === cand.walletId) : null) || CategoryEngine.findWalletByCategory(cand.category) || stateManager.getFreeMoneyWallet();
+                return `
+              <button class="btn btn-secondary btn-sm btn-runnerup-item" data-runnerup-category="${cand.category}" data-runnerup-wallet-id="${candWallet.id}" style="flex: 1; min-width: 130px; display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; font-size: 0.75rem;">
+                <span style="display: flex; align-items: center; gap: 6px;">
+                  <span>${cand.icon}</span>
+                  <span style="font-weight: 600;">${cand.category}</span>
+                </span>
+                <span style="opacity: 0.75; font-size: 0.68rem; margin-left: 4px;">${cand.confidencePercent}%</span>
+              </button>
+            `;
+              })
+              .join('')}
+          </div>
+        </div>
+      `
+          : ''
+      }
+
+      <!-- Amount Section (if unspecified) -->
+      ${
+        !selectedAmount || selectedAmount <= 0
+          ? `
+        <div class="card" style="padding: 10px 14px; text-align: center; margin-bottom: 12px; background: var(--bg-subtle);">
+          <div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">
+            Amount to Pay
+          </div>
+          <div style="display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 6px;">
+            <span style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary);">₹</span>
+            <input
+              type="number"
+              id="input-uncertain-amount"
+              class="input-text"
+              placeholder="Enter amount"
+              style="font-size: 1.4rem; font-weight: 800; text-align: center; width: 140px; padding: 4px;"
+              min="1"
+            />
+          </div>
+        </div>
+      `
+          : ''
+      }
+
+      <!-- Remember Choice Toggle -->
+      <div class="card" style="padding: 10px 12px; background: var(--bg-surface-secondary); display: flex; align-items: center; justify-content: space-between;">
+        <label style="font-size: var(--text-xs); color: var(--text-primary); font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+          <input type="checkbox" id="chk-ml-remember-choice" checked />
+          <span>Remember this confirmation for future payments</span>
+        </label>
+      </div>
+    `;
+
+    footer.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+        <button class="btn btn-primary" id="btn-confirm-prediction" style="width: 100%; padding: 12px;">
+          Confirm ${prediction.category}
+        </button>
+        <button class="btn btn-secondary btn-sm" id="btn-choose-other-wallet" style="width: 100%;">
+          Select Different Wallet
+        </button>
+        <button class="btn btn-ghost btn-sm" data-close-modal="modal-confirm-payment" style="width: 100%;">
+          Cancel
+        </button>
+      </div>
+    `;
+
+    const getAmountToUse = () => {
+      let finalAmt = selectedAmount;
+      const amtInput = body.querySelector('#input-uncertain-amount');
+      if (amtInput) {
+        finalAmt = parseFloat(amtInput.value) || 0;
+      }
+      return finalAmt;
+    };
+
+    const handleConfirmChoice = async (confirmedCategory, chosenWallet) => {
+      const finalAmt = getAmountToUse();
+      const amtInput = body.querySelector('#input-uncertain-amount');
+      if (amtInput && (!finalAmt || finalAmt <= 0)) {
+        NavigationManager.showToast('Please enter an amount to proceed', 'warning');
+        return;
+      }
+
+      SoundEngine.playTap();
+
+      // Train online ML model with user confirmation
+      MlCategoryEngine.learn({ merchantName, upiId, amount: finalAmt, note }, confirmedCategory);
+
+      const shouldRemember = body.querySelector('#chk-ml-remember-choice')?.checked;
+      if (shouldRemember) {
+        await supabaseService.saveMerchantPreference({
+          userId,
+          upiId,
+          merchantName,
+          detectedMcc: mcc || null,
+          category: confirmedCategory,
+          walletId: chosenWallet.id,
+          source: 'user_confirmed_ml',
+        });
+        stateManager.setLearnedCategory(merchantName, confirmedCategory, chosenWallet.id);
+        NavigationManager.showToast(`Saved ${chosenWallet.name} preference for ${merchantName}`, 'success');
+      }
+
+      this.initiatePaymentFlow({
+        merchantName,
+        amount: finalAmt,
+        category: confirmedCategory,
+        icon: chosenWallet.icon || prediction.icon || '🏷️',
+        upiId,
+        mcc,
+        preferredWalletId: chosenWallet.id,
+        reason: `Confirmed by you (${confirmedCategory}).`,
+      });
+    };
+
+    // Primary Confirm Button
+    footer.querySelector('#btn-confirm-prediction')?.addEventListener('click', () => {
+      handleConfirmChoice(prediction.category, suggestedWallet);
+    });
+
+    body.querySelector('#btn-confirm-top-prediction')?.addEventListener('click', () => {
+      handleConfirmChoice(prediction.category, suggestedWallet);
+    });
+
+    // Runner-Up Chips
+    body.querySelectorAll('.btn-runnerup-item').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const cat = btn.getAttribute('data-runnerup-category');
+        const wid = btn.getAttribute('data-runnerup-wallet-id');
+        const chosenW = stateManager.getWallet(wid) || CategoryEngine.findWalletByCategory(cat) || stateManager.getFreeMoneyWallet();
+        handleConfirmChoice(cat, chosenW);
+      });
+    });
+
+    // Choose Different Wallet
+    footer.querySelector('#btn-choose-other-wallet')?.addEventListener('click', () => {
+      SoundEngine.playTap();
+      this.showWalletSelectionPrompt({
+        merchantName,
+        upiId,
+        mcc,
+        category: prediction.category,
+        icon: prediction.icon || '👤',
+        amount: getAmountToUse(),
         promptText: `Select wallet for ${merchantName}:`,
         isPersonal,
         isFirstTime: false,
@@ -1037,6 +1356,8 @@ export class PayView {
             walletId: chosenWallet.id,
             source: 'user',
           });
+          stateManager.setLearnedCategory(merchantName, chosenWallet.category || chosenWallet.name, chosenWallet.id);
+          MlCategoryEngine.learn({ merchantName, upiId, amount }, chosenWallet.category || chosenWallet.name);
           NavigationManager.showToast(`Saved ${chosenWallet.name} as preference for ${merchantName}`, 'success');
         }
 
@@ -1170,7 +1491,7 @@ export class PayView {
     let finalReason = reason;
 
     if (!chosenWallet) {
-      const classification = CategoryEngine.classifyMerchant(merchantName, amount || 0, category, mcc);
+      const classification = CategoryEngine.classifyMerchant(merchantName, amount || 0, category, mcc, null, resolvedUpiId);
       chosenWallet = classification.recommendedWallet || stateManager.getFreeMoneyWallet();
       finalReason = finalReason || classification.reason;
     }

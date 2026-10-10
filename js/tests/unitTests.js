@@ -9,6 +9,7 @@ import { FraudEngine, RISK_LEVELS } from '../engines/fraudEngine.js';
 import { SplitEngine } from '../engines/splitEngine.js';
 import { UpiQrEngine, parseUpiQr, getCategoryFromMcc, getPocketPeCategory, getWalletForCategory } from '../engines/upiQrEngine.js';
 import { CategoryEngine } from '../engines/categoryEngine.js';
+import { MlCategoryEngine } from '../engines/mlCategoryEngine.js';
 import { CommitmentEngine, EXECUTION_STATUSES } from '../engines/commitmentEngine.js';
 import { WalletEngine } from '../engines/walletEngine.js';
 import { supabaseService } from '../services/supabaseService.js';
@@ -1302,6 +1303,181 @@ export class UnitTests {
         'Auth Guard on Back Navigation (Req 2.C1-2.C4): Unauthenticated users cannot bypass login or access protected routes via Back button',
         tabAfterPopUnauth === 'auth',
         `Active tab after unauthorized back navigation: ${tabAfterPopUnauth}`
+      );
+    })();
+
+    // =========================================================================
+    // FEATURE 6: PLANNED MACHINE-LEARNING FALLBACK & USER CONFIRMATION TESTS
+    // =========================================================================
+
+    // Test ML 1: High-confidence Food prediction when MCC is absent
+    (() => {
+      MlCategoryEngine.resetUserAdaptation();
+      const pred = MlCategoryEngine.predict({
+        merchantName: 'Sharma Canteen & Fast Food',
+        upiId: 'sharmacanteen@paytm',
+        amount: 85,
+        note: '',
+        mcc: null,
+      });
+
+      assert(
+        'ML Fallback (Req 1): Predicts Food & Dining when MCC is absent with high confidence (>= 0.80) and recommends wallet_food',
+        pred.category === 'Food & Dining' &&
+          pred.confidence >= 0.80 &&
+          pred.isUncertain === false &&
+          pred.recommendedWallet?.id === 'wallet_food',
+        `Category: ${pred.category}, Confidence: ${pred.confidencePercent}%, Uncertain: ${pred.isUncertain}, Wallet: ${pred.recommendedWallet?.id}`
+      );
+    })();
+
+    // Test ML 2: High-confidence Transport and Education predictions when MCC is missing or "0000"
+    (() => {
+      MlCategoryEngine.resetUserAdaptation();
+      const transportPred = MlCategoryEngine.predict({
+        merchantName: 'Indian Oil Petrol Pump',
+        upiId: 'iocl@paytmwb',
+        amount: 450,
+        note: 'petrol fuel',
+        mcc: '0000',
+      });
+
+      const eduPred = MlCategoryEngine.predict({
+        merchantName: 'Campus Book Store & Xerox Center',
+        upiId: 'campusxerox@ybl',
+        amount: 140,
+        note: 'exam photocopy notes',
+        mcc: null,
+      });
+
+      assert(
+        'ML Fallback (Req 2): Predicts Transport & Fuel and College & Education when MCC is missing or "0000"',
+        transportPred.category === 'Transport & Fuel' &&
+          transportPred.confidence >= 0.80 &&
+          transportPred.isUncertain === false &&
+          transportPred.recommendedWallet?.id === 'wallet_transport' &&
+          eduPred.category === 'College & Education' &&
+          eduPred.confidence >= 0.80 &&
+          eduPred.isUncertain === false &&
+          eduPred.recommendedWallet?.id === 'wallet_college',
+        `Transport: ${transportPred.category} (${transportPred.confidencePercent}%), Edu: ${eduPred.category} (${eduPred.confidencePercent}%)`
+      );
+    })();
+
+    // Test ML 3: Transaction Note (tn) signal extraction
+    (() => {
+      MlCategoryEngine.resetUserAdaptation();
+      // Ambiguous generic payee name, but explicit note contains "hostel mess dinner"
+      const notePred = MlCategoryEngine.predict({
+        merchantName: 'Sharma',
+        upiId: 'sharma@oksbi',
+        amount: 120,
+        note: 'hostel mess dinner',
+        mcc: null,
+      });
+
+      assert(
+        'ML Fallback (Req 3): Extracts transaction note (tn) as classification signal when merchant name is short or ambiguous',
+        notePred.category === 'Food & Dining' &&
+          notePred.featuresUsed.some((f) => f.includes('note') || f.includes('mess') || f.includes('dinner')),
+        `Category: ${notePred.category}, Confidence: ${notePred.confidencePercent}%, Features: ${notePred.featuresUsed.join(', ')}`
+      );
+    })();
+
+    // Test ML 4: VPA Handle and Ticket-Size amount modeling
+    (() => {
+      MlCategoryEngine.resetUserAdaptation();
+      const p2pPred = MlCategoryEngine.predict({
+        merchantName: 'Rohan Gupta',
+        upiId: '9876543210@oksbi',
+        amount: 250,
+        note: '',
+        mcc: null,
+      });
+
+      assert(
+        'ML Fallback (Req 4): VPA and ticket size modeling: Detects mobile-number VPA and small amount as Friends & Social',
+        p2pPred.category === 'Friends & Social' &&
+          p2pPred.recommendedWallet?.id === 'wallet_friends' &&
+          p2pPred.confidence >= 0.70,
+        `Category: ${p2pPred.category}, Confidence: ${p2pPred.confidencePercent}%, Wallet: ${p2pPred.recommendedWallet?.id}`
+      );
+    })();
+
+    // Test ML 5: Uncertainty Detection and Confidence Thresholding
+    (() => {
+      MlCategoryEngine.resetUserAdaptation();
+      // Ambiguous payee name with no domain signals
+      const uncertainPred = MlCategoryEngine.predict({
+        merchantName: 'Siddharth Enterprises & Co',
+        upiId: 'siddharth@upi',
+        amount: 600,
+        note: '',
+        mcc: null,
+      });
+
+      assert(
+        'Uncertainty Detection (Req 5): Identifies uninformative/ambiguous payee and flags isUncertain = true with confidence < 0.80 and ranked topCandidates',
+        uncertainPred.isUncertain === true &&
+          uncertainPred.confidence < 0.80 &&
+          Array.isArray(uncertainPred.topCandidates) &&
+          uncertainPred.topCandidates.length >= 2,
+        `Uncertain: ${uncertainPred.isUncertain}, Confidence: ${uncertainPred.confidencePercent}%, Top Candidates: ${uncertainPred.topCandidates.map((c) => `${c.category} (${c.confidencePercent}%)`).join(', ')}`
+      );
+    })();
+
+    // Test ML 6: User Confirmation & Continuous Online Learning
+    (() => {
+      MlCategoryEngine.resetUserAdaptation();
+      const beforePred = MlCategoryEngine.predict({
+        merchantName: 'Siddharth Enterprises & Co',
+        upiId: 'siddharth@upi',
+        amount: 600,
+        note: '',
+      });
+
+      // User confirms that Siddharth Enterprises is College & Education
+      const learnResult = MlCategoryEngine.learn(
+        { merchantName: 'Siddharth Enterprises & Co', upiId: 'siddharth@upi', amount: 600, note: '' },
+        'College & Education'
+      );
+
+      // Model now makes prediction after user learning
+      const afterPred = MlCategoryEngine.predict({
+        merchantName: 'Siddharth Enterprises & Co',
+        upiId: 'siddharth@upi',
+        amount: 600,
+        note: '',
+      });
+
+      assert(
+        'User Confirmation & Online Learning (Req 6): MlCategoryEngine.learn updates model weights so subsequent prediction becomes confident (>= 0.80) and certain',
+        learnResult === true &&
+          beforePred.isUncertain === true &&
+          afterPred.category === 'College & Education' &&
+          afterPred.confidence >= 0.80 &&
+          afterPred.isUncertain === false,
+        `Before: ${beforePred.category} (${beforePred.confidencePercent}%, uncertain: ${beforePred.isUncertain}) -> After: ${afterPred.category} (${afterPred.confidencePercent}%, uncertain: ${afterPred.isUncertain})`
+      );
+
+      MlCategoryEngine.resetUserAdaptation();
+    })();
+
+    // Test ML 7: CategoryEngine fallback integration & explicit MCC precedence
+    (() => {
+      MlCategoryEngine.resetUserAdaptation();
+      // 1. Fallback when MCC is absent and keyword rules don't match
+      const fallbackResult = CategoryEngine.classifyMerchant('Mahalaxmi Tiffin & Meals', 90, null, null);
+      // 2. Explicit MCC takes precedence
+      const mccResult = CategoryEngine.classifyMerchant('Mahalaxmi Tiffin & Meals', 90, null, '5912'); // 5912 is Medical
+
+      assert(
+        'CategoryEngine Integration (Req 7): Uses ML fallback when MCC is absent, while preserving explicit MCC precedence',
+        fallbackResult.category === 'Food & Dining' &&
+          fallbackResult.source.startsWith('ml_fallback') &&
+          mccResult.category.startsWith('Medical') &&
+          mccResult.source === 'upi_mcc_code',
+        `Fallback Source: ${fallbackResult.source} (${fallbackResult.category}), MCC Source: ${mccResult.source} (${mccResult.category})`
       );
     })();
 

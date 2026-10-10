@@ -5,6 +5,7 @@
 import { stateManager } from '../state.js';
 import { KNOWN_MERCHANT_DIRECTORY } from '../config.js';
 import { getCategoryFromMcc, getWalletForCategory } from './upiQrEngine.js';
+import { MlCategoryEngine } from './mlCategoryEngine.js';
 
 export class CategoryEngine {
   /**
@@ -64,12 +65,12 @@ export class CategoryEngine {
   /**
    * Intelligently classify a merchant and recommend the best wallet
    */
-  static classifyMerchant(merchantName, amount = 0, explicitCategory = null, explicitMcc = null) {
-    if (!merchantName && !explicitCategory) {
+  static classifyMerchant(merchantName, amount = 0, explicitCategory = null, explicitMcc = null, note = null, upiId = null) {
+    if (!merchantName && !explicitCategory && !upiId) {
       return this.fallbackClassification();
     }
 
-    const cleanName = (merchantName || 'Merchant').trim();
+    const cleanName = (merchantName || (upiId ? upiId.split('@')[0] : 'Merchant')).trim();
     const lowerName = cleanName.toLowerCase();
     const wallets = stateManager.getWallets();
 
@@ -144,7 +145,7 @@ export class CategoryEngine {
       };
     }
 
-    // 3. Keyword / MCC heuristics
+    // 4. Keyword / MCC heuristics
     for (const rule of this.KEYWORD_RULES) {
       const match = rule.keywords.some((kw) => lowerName.includes(kw));
       if (match) {
@@ -171,7 +172,32 @@ export class CategoryEngine {
       }
     }
 
-    // 4. Default Fallback -> Free Money
+    // 5. Machine Learning Fallback (when MCC is absent or unmapped)
+    const mlPrediction = MlCategoryEngine.predict({
+      merchantName: cleanName,
+      upiId,
+      amount,
+      note,
+    });
+
+    if (mlPrediction && mlPrediction.category) {
+      return {
+        merchantName: cleanName,
+        category: mlPrediction.category,
+        recommendedWallet: mlPredTargetWallet(mlPrediction, wallets) || this.findWalletByCategory(mlPrediction.category) || stateManager.getFreeMoneyWallet(),
+        isLearned: false,
+        isUncertain: mlPrediction.isUncertain,
+        confidence: mlPrediction.confidence,
+        confidencePercent: mlPrediction.confidencePercent,
+        topCandidates: mlPrediction.topCandidates,
+        featuresUsed: mlPrediction.featuresUsed,
+        source: mlPrediction.source,
+        icon: mlPrediction.icon,
+        reason: mlPrediction.reason,
+      };
+    }
+
+    // 6. Default Fallback -> Free Money
     return this.fallbackClassification(cleanName);
   }
 
@@ -213,9 +239,20 @@ export class CategoryEngine {
    */
   static teachMerchantCategory(merchantName, category, walletId) {
     stateManager.setLearnedCategory(merchantName, category, walletId);
+    MlCategoryEngine.learn({ merchantName }, category);
     return {
       success: true,
       message: `Remembered! Future payments to "${merchantName}" will be set to ${category}.`,
     };
   }
 }
+
+function mlPredTargetWallet(mlPrediction, wallets) {
+  if (mlPrediction.recommendedWallet) return mlPrediction.recommendedWallet;
+  if (mlPrediction.walletId) {
+    const found = wallets.find((w) => w.id === mlPrediction.walletId);
+    if (found) return found;
+  }
+  return null;
+}
+
