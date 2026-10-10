@@ -72,7 +72,7 @@ export class HomeView {
       <div class="balance-hero-card">
         <div class="balance-top-row">
           <div class="balance-label">
-            <span>TOTAL UNDERLYING BALANCE</span>
+            <span>TOTAL ACCOUNT BALANCE</span>
           </div>
           <button class="toggle-privacy-btn" id="btn-toggle-privacy" aria-label="Toggle balance visibility">
             ${isHidden ? '👁️' : '👁️‍🗨️'}
@@ -105,9 +105,14 @@ export class HomeView {
           </div>
         </div>
 
-        <div class="simulated-note">
-          <span>ℹ️</span>
-          <span>1 underlying simulated account, mentally divided into virtual wallets.</span>
+        <div class="account-link-badge" style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding: 7px 12px; background: rgba(255, 255, 255, 0.04); border-radius: 10px; font-size: 0.73rem; color: var(--text-secondary); border: 1px solid rgba(255, 255, 255, 0.05);">
+          <span style="display: flex; align-items: center; gap: 7px;">
+            <span>🏦</span>
+            <span>HDFC Bank •• 4821 • Primary UPI</span>
+          </span>
+          <span style="display: flex; align-items: center; gap: 4px; color: var(--success); font-weight: 700; font-size: 0.7rem;">
+            <span style="font-size: 0.55rem;">●</span> Active
+          </span>
         </div>
       </div>
 
@@ -144,7 +149,7 @@ export class HomeView {
       <div class="quick-actions-grid">
         <div class="action-tile" id="action-receive-money" role="button" tabindex="0">
           <div class="action-icon">📥</div>
-          <span class="action-label">Receive</span>
+          <span class="action-label">Receive QR</span>
         </div>
         <div class="action-tile" id="action-quick-pay" role="button" tabindex="0">
           <div class="action-icon">⚡</div>
@@ -160,11 +165,11 @@ export class HomeView {
         </div>
         <div class="action-tile" id="action-move-money" role="button" tabindex="0">
           <div class="action-icon">🔄</div>
-          <span class="action-label">Move Money</span>
+          <span class="action-label">Transfer</span>
         </div>
         <div class="action-tile" id="action-split-rules" role="button" tabindex="0">
           <div class="action-icon">📊</div>
-          <span class="action-label">Split Rules</span>
+          <span class="action-label">Auto-Split</span>
         </div>
       </div>
 

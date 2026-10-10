@@ -4,6 +4,7 @@
    ========================================================================== */
 
 import { supabaseService } from '../services/supabaseService.js';
+import { devModeService } from '../services/devModeService.js';
 import { stateManager } from '../state.js';
 import { NavigationManager } from './navigation.js';
 import { SoundEngine } from './sound.js';
@@ -35,6 +36,7 @@ export class AuthModal {
     }
 
     const isConfigured = supabaseService.isConfigured();
+    const isDev = devModeService.isDevMode();
 
     body.innerHTML = `
       <div style="text-align: center; margin-bottom: 16px;">
@@ -51,11 +53,11 @@ export class AuthModal {
         </p>
       </div>
 
-      <!-- Supabase Configuration Status Banner -->
-      ${!isConfigured ? `
+      <!-- Supabase Configuration Status Banner (DEVELOPER MODE ONLY) -->
+      ${isDev && !isConfigured ? `
         <div class="card" style="padding: 10px 12px; background: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
           <div style="font-size: 0.76rem; color: var(--text-secondary);">
-            <strong style="color: #f59e0b;">⚙️ Setup Required:</strong> Connect your Supabase Project URL & Anon Key to authenticate.
+            <strong style="color: #f59e0b;">⚙️ Dev Setup:</strong> Connect Supabase Project URL & Anon Key to authenticate.
           </div>
           <button class="btn btn-sm btn-ghost" id="btn-auth-open-config" style="white-space: nowrap; font-size: 0.72rem; padding: 4px 8px;">
             Configure
@@ -134,12 +136,14 @@ export class AuthModal {
           `}
         </div>
 
-        <!-- Connection Settings Link -->
-        <div style="text-align: center; margin-top: 4px;">
-          <button type="button" id="btn-auth-settings-link" style="background: none; border: none; font-size: 0.72rem; color: var(--text-muted); cursor: pointer; text-decoration: underline;">
-            ⚙️ Supabase Connection Settings
-          </button>
-        </div>
+        <!-- Connection Settings Link (DEVELOPER MODE ONLY) -->
+        ${isDev ? `
+          <div style="text-align: center; margin-top: 4px;">
+            <button type="button" id="btn-auth-settings-link" style="background: none; border: none; font-size: 0.72rem; color: #f59e0b; cursor: pointer; text-decoration: underline;">
+              ⚙️ Supabase Connection Settings
+            </button>
+          </div>
+        ` : ''}
       </form>
     `;
 

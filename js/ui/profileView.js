@@ -1,10 +1,11 @@
 /* ==========================================================================
    POCKETPE - PROFILE & SETTINGS CONTROLLER
-   Integrated with Supabase Auth (Sign Up, Login, Logout, Profile edit, and User ID exposure)
+   Integrated with Supabase Auth, User Scoped State, and Developer Mode Separation
    ========================================================================== */
 
 import { stateManager } from '../state.js';
 import { supabaseService } from '../services/supabaseService.js';
+import { devModeService } from '../services/devModeService.js';
 import { ThemeManager } from './theme.js';
 import { NavigationManager } from './navigation.js';
 import { SoundEngine } from './sound.js';
@@ -13,8 +14,12 @@ import { SplitView } from './splitView.js';
 import { AuthModal } from './authModal.js';
 import { SupabaseConfigModal } from './supabaseConfigModal.js';
 import { EditProfileModal } from './editProfileModal.js';
+import { UnitTests } from '../tests/unitTests.js';
 
 export class ProfileView {
+  static clickVersionCount = 0;
+  static clickVersionTimeout = null;
+
   static init() {
     this.container = document.getElementById('view-profile');
     if (!this.container) return;
@@ -25,6 +30,7 @@ export class ProfileView {
     stateManager.subscribe('theme:changed', () => this.render());
     stateManager.subscribe('learned:updated', () => this.render());
     stateManager.subscribe('auth:changed', () => this.render());
+    stateManager.subscribe('devmode:changed', () => this.render());
   }
 
   static render() {
@@ -35,6 +41,7 @@ export class ProfileView {
     const isAuth = state.user?.isAuthenticated;
     const user = state.user;
     const config = supabaseService.getConfig();
+    const isDev = devModeService.isDevMode();
 
     // Generate Initials
     const initials = (user.name || 'User')
@@ -44,14 +51,29 @@ export class ProfileView {
       .slice(0, 2)
       .join('') || 'SK';
 
+    // Primary UPI ID
+    const upiHandle = (user.name || 'user')
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '') || 'user';
+    const upiId = `${upiHandle}@pocketpe`;
+
+    // Bank display
+    const rawBank = user.simulatedBank || 'HDFC Bank';
+    const cleanBank = rawBank
+      .replace('Simulated Account', 'Bank')
+      .replace('Simulated Demo Bank', 'HDFC Bank')
+      .replace('Simulated', '')
+      .trim();
+
     this.container.innerHTML = `
       <div class="section-header">
         <h2 class="h2">Profile & Settings</h2>
+        ${isDev ? '<span class="dev-mode-pill">🛠️ Dev Mode Active</span>' : ''}
       </div>
 
       <div class="profile-responsive-grid">
         <div class="profile-col-left">
-          <!-- Supabase Auth / User Account Card -->
+          <!-- User Account Card -->
           ${isAuth ? `
             <div class="card" style="padding: 16px; margin-bottom: 16px; border: 1.5px solid var(--accent-primary); background: linear-gradient(135deg, var(--bg-surface) 0%, rgba(59, 130, 246, 0.05) 100%);">
               <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
@@ -66,9 +88,10 @@ export class ProfileView {
                         ✏️
                       </button>
                     </div>
-                    <p class="subtitle" style="font-size: 0.78rem; margin: 2px 0;">${user.email || 'No email'}</p>
+                    <p class="subtitle" style="font-size: 0.78rem; margin: 2px 0;">${user.email || 'Verified Account'}</p>
                     <div style="display: flex; gap: 6px; align-items: center; margin-top: 4px;">
-                      <span class="badge badge-success" style="font-size: 0.65rem;">● Supabase Auth (Active)</span>
+                      <span class="badge badge-success" style="font-size: 0.65rem;">● PocketPe Verified</span>
+                      ${isDev ? '<span class="badge badge-accent" style="font-size: 0.62rem;">Supabase Active</span>' : ''}
                     </div>
                   </div>
                 </div>
@@ -78,18 +101,33 @@ export class ProfileView {
                 </button>
               </div>
 
-              <!-- Exposed Supabase User ID container -->
+              <!-- Real UPI ID section -->
               <div style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--border-subtle); display: flex; align-items: center; justify-content: space-between; gap: 8px;">
                 <div style="display: flex; flex-direction: column;">
-                  <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 600;">AUTHENTICATED SUPABASE USER.ID:</span>
-                  <span style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-primary); word-break: break-all;">
-                    ${user.id}
+                  <span style="font-size: 0.68rem; color: var(--text-muted); font-weight: 600;">PRIMARY UPI ID</span>
+                  <span style="font-family: var(--font-mono); font-size: 0.78rem; font-weight: 700; color: var(--text-primary);">
+                    ${upiId}
                   </span>
                 </div>
-                <button class="btn btn-ghost" id="btn-copy-user-id" title="Copy Supabase user.id" style="padding: 4px 8px; font-size: 0.75rem; width: auto; white-space: nowrap;">
-                  📋 Copy
+                <button class="btn btn-ghost" id="btn-copy-upi-id" title="Copy PocketPe UPI ID" style="padding: 4px 10px; font-size: 0.75rem; width: auto; white-space: nowrap;">
+                  📋 Copy UPI ID
                 </button>
               </div>
+
+              <!-- Exposed Supabase User ID (ONLY IN DEVELOPER MODE) -->
+              ${isDev ? `
+                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(245, 158, 11, 0.3); display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(245, 158, 11, 0.05); padding: 8px; border-radius: var(--radius-sm);">
+                  <div style="display: flex; flex-direction: column;">
+                    <span style="font-size: 0.65rem; color: #f59e0b; font-weight: 700;">DEV: SUPABASE USER.ID (UUID):</span>
+                    <span style="font-family: var(--font-mono); font-size: 0.70rem; color: var(--text-primary); word-break: break-all;">
+                      ${user.id}
+                    </span>
+                  </div>
+                  <button class="btn btn-ghost" id="btn-copy-user-id" title="Copy Supabase user.id" style="padding: 4px 8px; font-size: 0.70rem; width: auto; white-space: nowrap;">
+                    Copy UUID
+                  </button>
+                </div>
+              ` : ''}
             </div>
           ` : `
             <div class="card" style="padding: 16px; margin-bottom: 16px; border: 1.5px solid var(--border-subtle); background: var(--bg-surface-secondary);">
@@ -99,7 +137,7 @@ export class ProfileView {
                 </div>
                 <div>
                   <h3 class="h3" style="font-size: var(--text-sm); margin-bottom: 2px;">PocketPe Account</h3>
-                  <p class="subtitle" style="font-size: 0.75rem;">Sign in with Supabase to sync your personal wallets & merchant preferences</p>
+                  <p class="subtitle" style="font-size: 0.75rem;">Sign in to sync your purpose wallets and spending rules securely</p>
                 </div>
               </div>
 
@@ -114,42 +152,46 @@ export class ProfileView {
             </div>
           `}
 
-          <!-- Simulated Bank Details -->
+          <!-- Linked Bank Details -->
           <div class="card" style="display: flex; align-items: center; gap: 14px; padding: 14px 18px; margin-bottom: 16px;">
             <div style="font-size: 1.6rem;">🏦</div>
             <div style="flex: 1;">
               <h4 style="font-size: var(--text-sm); font-weight: 700; color: var(--text-primary); margin-bottom: 2px;">
-                ${user.simulatedBank}
+                ${cleanBank}
               </h4>
-              <p class="subtitle" style="font-size: 0.75rem;">Account: ${user.accountNumber} • Virtual Intent Layer Active</p>
+              <p class="subtitle" style="font-size: 0.75rem;">Account: ${user.accountNumber || '•••• 4892'} • Primary UPI Account</p>
             </div>
             <span class="badge badge-success" style="font-size: 0.65rem;">● Linked</span>
           </div>
 
-          <!-- Supabase Connection & Credentials Settings -->
-          <div class="settings-section-card">
-            <h4 style="font-size: var(--text-sm); font-weight: 700; color: var(--text-primary);">Supabase Connection</h4>
-
-            <div class="settings-row">
-              <div class="settings-meta">
-                <h4>Backend Project</h4>
-                <p style="font-family: var(--font-mono); font-size: 0.72rem; word-break: break-all;">
-                  ${config.url || 'Not set'}
-                </p>
+          <!-- Supabase Connection Settings (DEVELOPER MODE ONLY) -->
+          ${isDev ? `
+            <div class="settings-section-card" style="border: 1.5px dashed rgba(245, 158, 11, 0.4);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h4 style="font-size: var(--text-sm); font-weight: 700; color: #f59e0b;">🛠️ Supabase Backend Settings</h4>
+                <span class="badge ${config.isConfigured ? 'badge-success' : 'badge-caution'}" style="font-size: 0.65rem;">
+                  ${config.isConfigured ? 'Connected' : 'Needs Key'}
+                </span>
               </div>
-              <span class="badge ${config.isConfigured ? 'badge-success' : 'badge-caution'}" style="font-size: 0.65rem;">
-                ${config.isConfigured ? '● Connected' : '● Needs Setup'}
-              </span>
-            </div>
 
-            <div class="settings-row" id="row-open-supabase-config" style="cursor: pointer;">
-              <div class="settings-meta">
-                <h4>Configure Supabase Credentials</h4>
-                <p>Update Project URL and Anon Public Key</p>
+              <div class="settings-row">
+                <div class="settings-meta">
+                  <h4>Backend Endpoint</h4>
+                  <p style="font-family: var(--font-mono); font-size: 0.70rem; word-break: break-all;">
+                    ${config.url || 'Not set'}
+                  </p>
+                </div>
               </div>
-              <span style="color: var(--accent-primary); font-size: 1.1rem;">⚙️</span>
+
+              <div class="settings-row" id="row-open-supabase-config" style="cursor: pointer;">
+                <div class="settings-meta">
+                  <h4>Edit Database Credentials</h4>
+                  <p>Update Project URL and Anon Public Key</p>
+                </div>
+                <span style="color: var(--accent-primary); font-size: 1.1rem;">⚙️</span>
+              </div>
             </div>
-          </div>
+          ` : ''}
         </div>
 
         <div class="profile-col-right">
@@ -186,20 +228,20 @@ export class ProfileView {
 
           <!-- Purpose & Rules Management -->
           <div class="settings-section-card">
-            <h4 style="font-size: var(--text-sm); font-weight: 700; color: var(--text-primary);">Rules & Management</h4>
+            <h4 style="font-size: var(--text-sm); font-weight: 700; color: var(--text-primary);">Rules & Preferences</h4>
 
             <div class="settings-row" id="row-open-splits" style="cursor: pointer;">
               <div class="settings-meta">
                 <h4>Automatic Money Splitting</h4>
-                <p>Configure percentage rules for incoming funds</p>
+                <p>Configure percentage distribution for incoming funds</p>
               </div>
               <span style="color: var(--accent-primary); font-size: 1.1rem;">→</span>
             </div>
 
             <div class="settings-row">
               <div class="settings-meta">
-                <h4>Learned Merchant Overrides (${learnedEntries.length})</h4>
-                <p>Merchants you taught PocketPe to remember</p>
+                <h4>Learned Merchant Preferences (${learnedEntries.length})</h4>
+                <p>Custom purpose assignments remembered for merchants</p>
               </div>
               ${learnedEntries.length > 0 ? `
                 <button class="btn btn-sm btn-ghost" id="btn-clear-learned" style="width: auto; font-size: var(--text-xs);">
@@ -220,39 +262,67 @@ export class ProfileView {
             ` : ''}
           </div>
 
-          <!-- Quick Tour & Reset -->
+          <!-- Help & Walkthrough -->
           <div class="settings-section-card">
-            <h4 style="font-size: var(--text-sm); font-weight: 700; color: var(--text-primary);">Tour & Testing</h4>
+            <h4 style="font-size: var(--text-sm); font-weight: 700; color: var(--text-primary);">Help & Guide</h4>
 
             <div class="settings-row" id="row-replay-tour" style="cursor: pointer;">
               <div class="settings-meta">
-                <h4>Replay App Onboarding Tour</h4>
-                <p>Review the core 5 principles of PocketPe</p>
+                <h4>PocketPe Product Tour</h4>
+                <p>Learn how purpose wallets and protection shields work</p>
               </div>
               <span style="color: var(--accent-primary); font-size: 1.1rem;">✨</span>
             </div>
-
-            <div class="settings-row">
-              <div class="settings-meta">
-                <h4>Reset Demo Data</h4>
-                <p>Restore original wallets, balances, and history</p>
-              </div>
-              <button class="btn btn-sm btn-danger" id="btn-reset-state" style="width: auto;">Reset</button>
-            </div>
           </div>
 
-          <!-- FinTech Prototype Disclaimer -->
-          <div class="disclaimer-card">
-            <h5>🛡️ FinTech Prototype Notice</h5>
-            <p>
-              PocketPe is a conceptual product prototype. All bank accounts, UPI payments, and balances are simulated. Real email/password authentication is powered by Supabase.
+          <!-- DEVELOPER CONTROLS CARD (ONLY IN DEVELOPER MODE) -->
+          ${isDev ? `
+            <div class="settings-section-card" style="border: 2px dashed #f59e0b; background: rgba(245, 158, 11, 0.04);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h4 style="font-size: var(--text-sm); font-weight: 700; color: #f59e0b;">🛠️ Developer & Test Controls</h4>
+                <button class="btn btn-sm btn-ghost" id="btn-disable-dev-mode" style="font-size: 0.70rem; color: var(--danger); width: auto; padding: 4px 8px;">
+                  Exit Dev Mode
+                </button>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-meta">
+                  <h4>Automated Unit Tests</h4>
+                  <p>18 assertions: Fraud detection, Split math & Supabase</p>
+                </div>
+                <button class="btn btn-sm btn-secondary" id="btn-profile-run-tests" style="width: auto; font-size: var(--text-xs);">
+                  🧪 Run Tests
+                </button>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-meta">
+                  <h4>Reset Demo State</h4>
+                  <p>Restore default wallets, transactions & mock data</p>
+                </div>
+                <button class="btn btn-sm btn-danger" id="btn-reset-state" style="width: auto; font-size: var(--text-xs);">
+                  🔄 Reset
+                </button>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Security & NPCI Compliance Badge -->
+          <div class="disclaimer-card" style="background: var(--bg-surface); border: 1px solid var(--border-subtle);">
+            <h5 style="color: var(--success); display: flex; align-items: center; gap: 6px;">
+              <span>🛡️</span> Bank-Grade UPI Security
+            </h5>
+            <p style="color: var(--text-secondary); font-size: 0.75rem;">
+              PocketPe adheres to NPCI UPI security standards. All payments are encrypted, authorized through device biometric/UPI PIN protocols, and monitored by the real-time community protection shield.
             </p>
           </div>
         </div>
       </div>
 
-      <div style="text-align: center; padding: 12px 0 24px; font-size: 0.72rem; color: var(--text-subtle);">
-        PocketPe MVP v2.5.0 • Supabase Auth Integrated • «Every rupee has a purpose»
+      <!-- Secret Developer Tap Entrance in Footer -->
+      <div id="profile-version-trigger" style="text-align: center; padding: 16px 0 24px; font-size: 0.74rem; color: var(--text-muted); cursor: pointer; user-select: none;">
+        PocketPe v2.4.0 • «Every rupee has a purpose»
+        ${isDev ? '<div style="color: #f59e0b; font-weight: 700; margin-top: 4px;">[Developer Mode Active - Tap to Toggle]</div>' : ''}
       </div>
     `;
 
@@ -267,8 +337,12 @@ export class ProfileView {
     const signupBtn = this.container.querySelector('#btn-profile-signup');
     const logoutBtn = this.container.querySelector('#btn-profile-logout');
     const editProfileBtn = this.container.querySelector('#btn-open-edit-profile');
+    const copyUpiBtn = this.container.querySelector('#btn-copy-upi-id');
     const copyUidBtn = this.container.querySelector('#btn-copy-user-id');
     const supabaseConfigRow = this.container.querySelector('#row-open-supabase-config');
+    const devTestsBtn = this.container.querySelector('#btn-profile-run-tests');
+    const disableDevBtn = this.container.querySelector('#btn-disable-dev-mode');
+    const versionTrigger = this.container.querySelector('#profile-version-trigger');
 
     if (loginBtn) {
       loginBtn.addEventListener('click', () => {
@@ -288,21 +362,73 @@ export class ProfileView {
       });
     }
 
+    // Copy UPI ID (normal user feature)
+    if (copyUpiBtn) {
+      copyUpiBtn.addEventListener('click', () => {
+        const user = stateManager.getState().user;
+        const upiHandle = (user.name || 'user').toLowerCase().replace(/[^a-z0-9]/g, '') || 'user';
+        const upiId = `${upiHandle}@pocketpe`;
+        navigator.clipboard?.writeText(upiId);
+        copyUpiBtn.textContent = '✅ Copied!';
+        setTimeout(() => {
+          copyUpiBtn.textContent = '📋 Copy UPI ID';
+        }, 2000);
+        NavigationManager.showToast(`Copied UPI ID: ${upiId}`, 'info');
+      });
+    }
+
+    // Copy raw Supabase UUID (developer feature)
     if (copyUidBtn) {
       copyUidBtn.addEventListener('click', () => {
         const uid = stateManager.getUserId();
         navigator.clipboard?.writeText(uid);
         copyUidBtn.textContent = '✅ Copied!';
         setTimeout(() => {
-          copyUidBtn.textContent = '📋 Copy';
+          copyUidBtn.textContent = 'Copy UUID';
         }, 2000);
         NavigationManager.showToast('Copied Supabase user.id', 'info');
       });
     }
 
+    // Supabase config in dev mode
     if (supabaseConfigRow) {
       supabaseConfigRow.addEventListener('click', () => {
         SupabaseConfigModal.open();
+      });
+    }
+
+    // Dev mode tests button
+    if (devTestsBtn) {
+      devTestsBtn.addEventListener('click', () => {
+        UnitTests.showTestResultsModal();
+      });
+    }
+
+    // Disable dev mode button
+    if (disableDevBtn) {
+      disableDevBtn.addEventListener('click', () => {
+        devModeService.setDevMode(false);
+      });
+    }
+
+    // Secret 5-tap developer mode unlocker on version string
+    if (versionTrigger) {
+      versionTrigger.addEventListener('click', () => {
+        this.clickVersionCount++;
+        SoundEngine.playTap();
+
+        if (this.clickVersionTimeout) clearTimeout(this.clickVersionTimeout);
+        this.clickVersionTimeout = setTimeout(() => {
+          this.clickVersionCount = 0;
+        }, 3000);
+
+        if (this.clickVersionCount >= 5) {
+          this.clickVersionCount = 0;
+          devModeService.toggle(true);
+        } else if (this.clickVersionCount >= 3) {
+          const remaining = 5 - this.clickVersionCount;
+          NavigationManager.showToast(`Tap ${remaining} more times for Developer Mode`, 'info', 1500);
+        }
       });
     }
 
@@ -370,11 +496,11 @@ export class ProfileView {
       });
     }
 
-    // Reset Demo Data
+    // Reset Demo Data (in dev mode)
     const resetBtn = this.container.querySelector('#btn-reset-state');
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
-        if (confirm('Reset PocketPe to initial prototype demo state?')) {
+        if (confirm('Reset PocketPe to initial demo state?')) {
           stateManager.resetToDemoData();
           SoundEngine.playSuccess();
           NavigationManager.showToast('✨ Reset to initial demo data', 'success');

@@ -1,6 +1,6 @@
 /* ==========================================================================
-   POCKETPE - MOVE MONEY (REBALANCE) CONTROLLER
-   Rebalance money between virtual wallets without altering the single underlying balance
+   POCKETPE - MOVE MONEY (TRANSFER BETWEEN WALLETS) CONTROLLER
+   Transfers money between virtual purpose wallets without altering the single underlying balance
    ========================================================================== */
 
 import { stateManager } from '../state.js';
@@ -55,14 +55,14 @@ export class MoveModal {
 
     body.innerHTML = `
       <div style="text-align: center; margin-bottom: 4px;">
-        <span class="badge badge-accent">Virtual Rebalance</span>
-        <h3 class="h3" style="color: var(--text-primary); margin-top: 4px;">Move Money</h3>
-        <p class="subtitle">Change purpose between wallets. Total bank balance stays identical.</p>
+        <span class="badge badge-accent">Wallet Transfer</span>
+        <h3 class="h3" style="color: var(--text-primary); margin-top: 4px;">Transfer Between Wallets</h3>
+        <p class="subtitle">Move allocated money between purposes. Total account balance remains unaffected.</p>
       </div>
 
       <!-- Amount Input -->
       <div class="card" style="text-align: center; padding: 18px;">
-        <div style="font-size: var(--text-xs); color: var(--text-muted); font-weight: 600;">AMOUNT TO MOVE</div>
+        <div style="font-size: var(--text-xs); color: var(--text-muted); font-weight: 600;">AMOUNT TO TRANSFER</div>
         <div class="amount-input-hero" style="padding: 10px 0;">
           <span class="amount-currency">₹</span>
           <input type="number" class="amount-hero-field" id="move-amount-input" value="${this.amount}" min="50" step="100" />
@@ -97,7 +97,7 @@ export class MoveModal {
 
         <div class="transfer-middle-indicator">
           <span>↓</span>
-          <span class="transfer-pill">Moving ${WalletEngine.formatRupee(this.amount)}</span>
+          <span class="transfer-pill">Transferring ${WalletEngine.formatRupee(this.amount)}</span>
           <span>↓</span>
         </div>
 
@@ -123,7 +123,7 @@ export class MoveModal {
 
     footer.innerHTML = `
       <button class="btn btn-primary" id="btn-confirm-move-money" ${!canMove ? 'disabled style="opacity: 0.6; cursor: not-allowed;"' : ''}>
-        Move ${WalletEngine.formatRupee(this.amount)} from ${fromWallet.name} to ${toWallet.name}
+        Transfer ${WalletEngine.formatRupee(this.amount)} from ${fromWallet.name} to ${toWallet.name}
       </button>
       <button class="btn btn-ghost btn-sm" data-close-modal="modal-move-money">Cancel</button>
     `;
@@ -174,7 +174,7 @@ export class MoveModal {
       });
     }
 
-    // Execute Move Money
+    // Execute Transfer
     const confirmBtn = footer.querySelector('#btn-confirm-move-money');
     if (confirmBtn && canMove) {
       confirmBtn.addEventListener('click', () => {

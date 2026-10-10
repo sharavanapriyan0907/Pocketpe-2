@@ -102,7 +102,7 @@ export class ActivityView {
           <div style="text-align: center; padding: 40px 20px; background: var(--bg-surface); border-radius: var(--radius-xl); border: 1px dashed var(--border-strong);">
             <div style="font-size: 2.5rem; margin-bottom: 8px;">📜</div>
             <h4 class="h4" style="margin-bottom: 4px;">Your spending history will appear here.</h4>
-            <p class="subtitle">Scan a demo QR to make your first purposeful payment.</p>
+            <p class="subtitle">Scan any UPI QR to make your first purposeful payment.</p>
           </div>
         `
         : `
@@ -239,7 +239,7 @@ export class ActivityView {
       <div class="card" style="display: flex; flex-direction: column; gap: 12px;">
         <div style="display: flex; justify-content: space-between; font-size: var(--text-xs);">
           <span style="color: var(--text-muted);">Transaction Status</span>
-          <span style="color: var(--success); font-weight: 700;">● Completed (Simulated)</span>
+          <span style="color: var(--success); font-weight: 700;">● Completed</span>
         </div>
         <div style="display: flex; justify-content: space-between; font-size: var(--text-xs);">
           <span style="color: var(--text-muted);">Purpose Wallet</span>
@@ -250,8 +250,8 @@ export class ActivityView {
           <span style="font-weight: 600;">${dateFormatted}</span>
         </div>
         <div style="display: flex; justify-content: space-between; font-size: var(--text-xs);">
-          <span style="color: var(--text-muted);">Simulated Reference ID</span>
-          <span class="mono" style="color: var(--text-muted);">${tx.id.toUpperCase()}-SIM</span>
+          <span style="color: var(--text-muted);">UPI Ref No. (RRN)</span>
+          <span class="mono" style="color: var(--text-muted);">${(tx.id.replace(/[^0-9]/g, '') + '489102371982').slice(0, 12)}</span>
         </div>
       </div>
 

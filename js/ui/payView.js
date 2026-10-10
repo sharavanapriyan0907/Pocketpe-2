@@ -16,6 +16,7 @@ import { supabaseService } from '../services/supabaseService.js';
 import { FraudModal } from './fraudModal.js';
 import { NavigationManager } from './navigation.js';
 import { SoundEngine } from './sound.js';
+import { devModeService } from '../services/devModeService.js';
 
 export class PayView {
   static container = null;
@@ -45,6 +46,7 @@ export class PayView {
     // Re-render when community reports or appeals update
     stateManager.subscribe('fraud:reported', () => this.render());
     stateManager.subscribe('fraud:appealed', () => this.render());
+    stateManager.subscribe('devmode:changed', () => this.render());
 
     // Lifecycle: Stop camera when leaving 'pay' tab, auto-start camera on entering 'pay' tab
     stateManager.subscribe('tab:switched', (tabId) => {
@@ -73,10 +75,14 @@ export class PayView {
   static render() {
     if (!this.container) return;
 
+    const isDev = devModeService.isDevMode();
+
     this.container.innerHTML = `
       <div class="section-header">
         <h2 class="h2">Scan & Pay</h2>
-        <span class="prototype-tag">Live Camera + Shield</span>
+        ${isDev
+          ? '<span class="dev-mode-pill">🛠️ Dev Mode</span>'
+          : '<span class="badge badge-success" style="font-size: 0.65rem;">● UPI 2.0 Ready</span>'}
       </div>
 
       <div class="pay-responsive-grid">
@@ -140,11 +146,11 @@ export class PayView {
         </div>
 
         <div class="pay-merchants-pane">
-          <!-- Quick Demo QR Merchants -->
+          <!-- Quick UPI Merchants / Contacts -->
           <div class="demo-merchants-section">
             <div class="title" style="display: flex; justify-content: space-between; align-items: center;">
-              <span>Demo QR Merchants (Instant Test):</span>
-              <span style="font-size: 0.72rem; color: var(--text-muted);">Tap to simulate</span>
+              <span>${isDev ? 'Demo QR Merchants (Instant Test):' : 'Recent UPI Payees'}</span>
+              <span style="font-size: 0.72rem; color: var(--text-muted);">${isDev ? 'Tap to simulate' : 'Tap to pay'}</span>
             </div>
             <div class="merchants-scroll-list">
               ${DEMO_MERCHANTS.map((m) => {
@@ -173,14 +179,16 @@ export class PayView {
             </div>
           </div>
 
-          <!-- Insufficient Balance Test Shortcut -->
-          <div class="card" style="padding: 12px 16px; background: var(--bg-subtle); display: flex; align-items: center; justify-content: space-between; margin-top: 12px;">
-            <div>
-              <div style="font-size: var(--text-xs); font-weight: 700; color: var(--text-primary);">🧪 Test Payment Protection Shield</div>
-              <div style="font-size: 0.72rem; color: var(--text-muted);">Simulate paying ₹2,500 from Transport (balance is low)</div>
+          <!-- Insufficient Balance Test Shortcut (DEVELOPER MODE ONLY) -->
+          ${isDev ? `
+            <div class="card" style="padding: 12px 16px; background: rgba(245, 158, 11, 0.05); border: 1.5px dashed #f59e0b; display: flex; align-items: center; justify-content: space-between; margin-top: 12px;">
+              <div>
+                <div style="font-size: var(--text-xs); font-weight: 700; color: #f59e0b;">🧪 Test Payment Protection Shield</div>
+                <div style="font-size: 0.72rem; color: var(--text-muted);">Force deficit: pay ₹2,500 from Transport (low balance)</div>
+              </div>
+              <button class="btn btn-sm btn-secondary" id="btn-test-deficit" style="width: auto;">Test Shield</button>
             </div>
-            <button class="btn btn-sm btn-secondary" id="btn-test-deficit" style="width: auto;">Test Shield</button>
-          </div>
+          ` : ''}
         </div>
       </div>
     `;

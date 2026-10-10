@@ -23,10 +23,14 @@ import { AuthModal } from './ui/authModal.js';
 import { SupabaseConfigModal } from './ui/supabaseConfigModal.js';
 import { EditProfileModal } from './ui/editProfileModal.js';
 import { UnitTests } from './tests/unitTests.js';
+import { devModeService } from './services/devModeService.js';
 
 class App {
   static init() {
     console.log('🚀 Initializing PocketPe: Purpose-Led Money App...');
+
+    // 0. Initialize Developer Mode Service
+    devModeService.init();
 
     // 1. Initialize Theme & Audio
     ThemeManager.init();
@@ -59,8 +63,10 @@ class App {
     // 6. Initialize Desktop Stage Controls
     this.setupDesktopControls();
 
-    // 7. Run Automated Unit Tests on Startup
-    UnitTests.runAll();
+    // 7. Run Automated Unit Tests on Startup if in Developer Mode
+    if (devModeService.isDevMode()) {
+      UnitTests.runAll();
+    }
 
     console.log('✨ PocketPe is ready. Every rupee has a purpose.');
   }

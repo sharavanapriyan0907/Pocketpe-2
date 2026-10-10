@@ -28,9 +28,9 @@
         <div class="brand-info">
           <h1>
             PocketPe
-            <span class="prototype-tag">MVP Prototype</span>
+            <span class="dev-mode-pill" id="badge-dev-mode" style="display: none;">🛠️ DEV MODE</span>
           </h1>
-          <p>«Every rupee has a purpose» • Virtual Intent-Based Money Management</p>
+          <p>«Every rupee has a purpose» • Intelligent Purpose-Led UPI Payments</p>
         </div>
       </div>
 
@@ -76,11 +76,11 @@
           <span class="accent-dot" data-color="teal" title="Cyan Teal"></span>
         </div>
 
-        <button class="desktop-btn" id="btn-desktop-tour" title="Take App Tour">
+        <button class="desktop-btn dev-control-only" id="btn-desktop-tour" title="Take App Tour">
           <span>✨</span> <span>Tour</span>
         </button>
 
-        <button class="desktop-btn" id="btn-desktop-tests" title="Run Unit Tests for Fraud Detection, Split Calculation & Supabase Auth">
+        <button class="desktop-btn dev-control-only" id="btn-desktop-tests" title="Run Unit Tests for Fraud Detection, Split Calculation & Supabase Auth">
           <span>🧪</span> <span>Run Tests</span>
         </button>
 
@@ -88,7 +88,7 @@
           <span>🔐</span> <span id="label-desktop-auth">Sign In</span>
         </button>
 
-        <button class="desktop-btn" id="btn-desktop-reset" title="Reset to Initial Demo State">
+        <button class="desktop-btn dev-control-only" id="btn-desktop-reset" title="Reset to Initial Demo State">
           <span>🔄</span> <span>Reset Data</span>
         </button>
       </div>
@@ -210,10 +210,10 @@
 
           <!-- Receive Money Cascade Modal -->
           <div class="modal-overlay" id="modal-receive-money" aria-hidden="true">
-            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Receive Simulated Funds">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Receive Funds via UPI">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Simulate Incoming Money</h3>
+                <h3 class="sheet-title" id="title-receive-modal">Receive Money</h3>
                 <button class="sheet-close-btn" data-close-modal="modal-receive-money" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
@@ -223,10 +223,10 @@
 
           <!-- Rebalance / Move Money Modal -->
           <div class="modal-overlay" id="modal-move-money" aria-hidden="true">
-            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Move Money Between Wallets">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Transfer Money Between Wallets">
               <div class="sheet-grabber"></div>
               <div class="sheet-header">
-                <h3 class="sheet-title">Rebalance Wallets</h3>
+                <h3 class="sheet-title" id="title-move-modal">Transfer Between Wallets</h3>
                 <button class="sheet-close-btn" data-close-modal="modal-move-money" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>

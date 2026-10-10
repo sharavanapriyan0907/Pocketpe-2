@@ -213,6 +213,24 @@
   border-top: 1px dashed var(--border-light);
 }
 
+.account-link-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-md);
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  transition: all var(--transition-fast);
+}
+
+.account-link-badge:hover {
+  border-color: var(--border-strong);
+}
+
 /* Quick Action Tiles */
 .quick-actions-grid {
   display: grid;

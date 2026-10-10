@@ -64,7 +64,7 @@ export class SplitView {
       <!-- Sample Incoming Amount Preview Pill -->
       <div class="card" style="padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;">
         <div>
-          <span style="font-size: var(--text-xs); color: var(--text-muted); font-weight: 600;">SIMULATED INCOMING</span>
+          <span style="font-size: var(--text-xs); color: var(--text-muted); font-weight: 600;">SAMPLE DEPOSIT PREVIEW</span>
           <div style="font-size: var(--text-lg); font-weight: 800; color: var(--text-primary);">${WalletEngine.formatRupee(this.sampleAmount)}</div>
         </div>
         <div style="display: flex; gap: 4px;">
