@@ -14,6 +14,7 @@ import { SplitView } from './splitView.js';
 import { AuthModal } from './authModal.js';
 import { SupabaseConfigModal } from './supabaseConfigModal.js';
 import { EditProfileModal } from './editProfileModal.js';
+import { FraudModal } from './fraudModal.js';
 import { UnitTests } from '../tests/unitTests.js';
 
 export class ProfileView {
@@ -61,14 +62,13 @@ export class ProfileView {
     const rawBank = user.simulatedBank || 'HDFC Bank';
     const cleanBank = rawBank
       .replace('Simulated Account', 'Bank')
-      .replace('Simulated Demo Bank', 'HDFC Bank')
+      .replace('Simulated Bank', 'HDFC Bank')
       .replace('Simulated', '')
       .trim();
 
     this.container.innerHTML = `
       <div class="section-header">
         <h2 class="h2">Profile & Settings</h2>
-        ${isDev ? '<span class="dev-mode-pill">🛠️ Dev Mode Active</span>' : ''}
       </div>
 
       <div class="profile-responsive-grid">
@@ -99,7 +99,6 @@ export class ProfileView {
                           Google Account
                         </span>
                       ` : ''}
-                      ${isDev ? '<span class="badge badge-accent" style="font-size: 0.62rem;">Supabase Active</span>' : ''}
                     </div>
                   </div>
                 </div>
@@ -121,21 +120,6 @@ export class ProfileView {
                   📋 Copy UPI ID
                 </button>
               </div>
-
-              <!-- Exposed Supabase User ID (ONLY IN DEVELOPER MODE) -->
-              ${isDev ? `
-                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(245, 158, 11, 0.3); display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(245, 158, 11, 0.05); padding: 8px; border-radius: var(--radius-sm);">
-                  <div style="display: flex; flex-direction: column;">
-                    <span style="font-size: 0.65rem; color: #f59e0b; font-weight: 700;">DEV: SUPABASE USER.ID (UUID):</span>
-                    <span style="font-family: var(--font-mono); font-size: 0.70rem; color: var(--text-primary); word-break: break-all;">
-                      ${user.id}
-                    </span>
-                  </div>
-                  <button class="btn btn-ghost" id="btn-copy-user-id" title="Copy Supabase user.id" style="padding: 4px 8px; font-size: 0.70rem; width: auto; white-space: nowrap;">
-                    Copy UUID
-                  </button>
-                </div>
-              ` : ''}
             </div>
           ` : `
             <div class="card" style="padding: 16px; margin-bottom: 16px; border: 1.5px solid var(--border-subtle); background: var(--bg-surface-secondary);">
@@ -184,35 +168,6 @@ export class ProfileView {
             </div>
             <span class="badge badge-success" style="font-size: 0.65rem;">● Linked</span>
           </div>
-
-          <!-- Supabase Connection Settings (DEVELOPER MODE ONLY) -->
-          ${isDev ? `
-            <div class="settings-section-card" style="border: 1.5px dashed rgba(245, 158, 11, 0.4);">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h4 style="font-size: var(--text-sm); font-weight: 700; color: #f59e0b;">🛠️ Supabase Backend Settings</h4>
-                <span class="badge ${config.isConfigured ? 'badge-success' : 'badge-caution'}" style="font-size: 0.65rem;">
-                  ${config.isConfigured ? 'Connected' : 'Needs Key'}
-                </span>
-              </div>
-
-              <div class="settings-row">
-                <div class="settings-meta">
-                  <h4>Backend Endpoint</h4>
-                  <p style="font-family: var(--font-mono); font-size: 0.70rem; word-break: break-all;">
-                    ${config.url || 'Not set'}
-                  </p>
-                </div>
-              </div>
-
-              <div class="settings-row" id="row-open-supabase-config" style="cursor: pointer;">
-                <div class="settings-meta">
-                  <h4>Edit Database Credentials</h4>
-                  <p>Update Project URL and Anon Public Key</p>
-                </div>
-                <span style="color: var(--accent-primary); font-size: 1.1rem;">⚙️</span>
-              </div>
-            </div>
-          ` : ''}
         </div>
 
         <div class="profile-col-right">
@@ -250,6 +205,14 @@ export class ProfileView {
           <!-- Purpose & Rules Management -->
           <div class="settings-section-card">
             <h4 style="font-size: var(--text-sm); font-weight: 700; color: var(--text-primary);">Rules & Preferences</h4>
+
+            <div class="settings-row" id="row-open-fraud-protection" style="cursor: pointer;">
+              <div class="settings-meta">
+                <h4>🛡️ Spam & Fraud Protection</h4>
+                <p>Check UPI trust score, lookup handles, or report scams</p>
+              </div>
+              <span style="color: var(--accent-primary); font-size: 1.1rem;">→</span>
+            </div>
 
             <div class="settings-row" id="row-open-splits" style="cursor: pointer;">
               <div class="settings-meta">
@@ -296,38 +259,6 @@ export class ProfileView {
             </div>
           </div>
 
-          <!-- DEVELOPER CONTROLS CARD (ONLY IN DEVELOPER MODE) -->
-          ${isDev ? `
-            <div class="settings-section-card" style="border: 2px dashed #f59e0b; background: rgba(245, 158, 11, 0.04);">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h4 style="font-size: var(--text-sm); font-weight: 700; color: #f59e0b;">🛠️ Developer & Test Controls</h4>
-                <button class="btn btn-sm btn-ghost" id="btn-disable-dev-mode" style="font-size: 0.70rem; color: var(--danger); width: auto; padding: 4px 8px;">
-                  Exit Dev Mode
-                </button>
-              </div>
-
-              <div class="settings-row">
-                <div class="settings-meta">
-                  <h4>Automated Unit Tests</h4>
-                  <p>27 assertions: Fraud, Split math, Google OAuth & Supabase</p>
-                </div>
-                <button class="btn btn-sm btn-secondary" id="btn-profile-run-tests" style="width: auto; font-size: var(--text-xs);">
-                  🧪 Run Tests
-                </button>
-              </div>
-
-              <div class="settings-row">
-                <div class="settings-meta">
-                  <h4>Reset Demo State</h4>
-                  <p>Restore default wallets, transactions & mock data</p>
-                </div>
-                <button class="btn btn-sm btn-danger" id="btn-reset-state" style="width: auto; font-size: var(--text-xs);">
-                  🔄 Reset
-                </button>
-              </div>
-            </div>
-          ` : ''}
-
           <!-- Security & NPCI Compliance Badge -->
           <div class="disclaimer-card" style="background: var(--bg-surface); border: 1px solid var(--border-subtle);">
             <h5 style="color: var(--success); display: flex; align-items: center; gap: 6px;">
@@ -340,10 +271,9 @@ export class ProfileView {
         </div>
       </div>
 
-      <!-- Secret Developer Tap Entrance in Footer -->
-      <div id="profile-version-trigger" style="text-align: center; padding: 16px 0 24px; font-size: 0.74rem; color: var(--text-muted); cursor: pointer; user-select: none;">
-        PocketPe v2.4.0 • «Every rupee has a purpose»
-        ${isDev ? '<div style="color: #f59e0b; font-weight: 700; margin-top: 4px;">[Developer Mode Active - Tap to Toggle]</div>' : ''}
+      <!-- Consumer Footer -->
+      <div style="text-align: center; padding: 16px 0 24px; font-size: 0.74rem; color: var(--text-muted); user-select: none;">
+        PocketPe • «Every rupee has a purpose»
       </div>
     `;
 
@@ -422,60 +352,7 @@ export class ProfileView {
       });
     }
 
-    // Copy raw Supabase UUID (developer feature)
-    if (copyUidBtn) {
-      copyUidBtn.addEventListener('click', () => {
-        const uid = stateManager.getUserId();
-        navigator.clipboard?.writeText(uid);
-        copyUidBtn.textContent = '✅ Copied!';
-        setTimeout(() => {
-          copyUidBtn.textContent = 'Copy UUID';
-        }, 2000);
-        NavigationManager.showToast('Copied Supabase user.id', 'info');
-      });
-    }
 
-    // Supabase config in dev mode
-    if (supabaseConfigRow) {
-      supabaseConfigRow.addEventListener('click', () => {
-        SupabaseConfigModal.open();
-      });
-    }
-
-    // Dev mode tests button
-    if (devTestsBtn) {
-      devTestsBtn.addEventListener('click', () => {
-        UnitTests.showTestResultsModal();
-      });
-    }
-
-    // Disable dev mode button
-    if (disableDevBtn) {
-      disableDevBtn.addEventListener('click', () => {
-        devModeService.setDevMode(false);
-      });
-    }
-
-    // Secret 5-tap developer mode unlocker on version string
-    if (versionTrigger) {
-      versionTrigger.addEventListener('click', () => {
-        this.clickVersionCount++;
-        SoundEngine.playTap();
-
-        if (this.clickVersionTimeout) clearTimeout(this.clickVersionTimeout);
-        this.clickVersionTimeout = setTimeout(() => {
-          this.clickVersionCount = 0;
-        }, 3000);
-
-        if (this.clickVersionCount >= 5) {
-          this.clickVersionCount = 0;
-          devModeService.toggle(true);
-        } else if (this.clickVersionCount >= 3) {
-          const remaining = 5 - this.clickVersionCount;
-          NavigationManager.showToast(`Tap ${remaining} more times for Developer Mode`, 'info', 1500);
-        }
-      });
-    }
 
     if (logoutBtn) {
       logoutBtn.addEventListener('click', async () => {
@@ -513,6 +390,15 @@ export class ProfileView {
       });
     });
 
+    // Spam & Fraud Protection shortcut
+    const fraudRow = this.container.querySelector('#row-open-fraud-protection');
+    if (fraudRow) {
+      fraudRow.addEventListener('click', () => {
+        SoundEngine.playTap();
+        FraudModal.openRiskDetailModal();
+      });
+    }
+
     // Open Splits shortcut
     const splitsRow = this.container.querySelector('#row-open-splits');
     if (splitsRow) {
@@ -541,17 +427,5 @@ export class ProfileView {
       });
     }
 
-    // Reset Demo Data (in dev mode)
-    const resetBtn = this.container.querySelector('#btn-reset-state');
-    if (resetBtn) {
-      resetBtn.addEventListener('click', () => {
-        if (confirm('Reset PocketPe to initial demo state?')) {
-          stateManager.resetToDemoData();
-          SoundEngine.playSuccess();
-          NavigationManager.showToast('✨ Reset to initial demo data', 'success');
-          this.render();
-        }
-      });
-    }
   }
 }

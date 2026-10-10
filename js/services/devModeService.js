@@ -113,8 +113,8 @@ class DevModeService {
         import('../tests/unitTests.js').then((m) => m.UnitTests.showTestResultsModal());
       },
       resetData: () => {
-        stateManager.resetToDemoData();
-        NavigationManager.showToast('Demo data reset', 'info');
+        stateManager.resetToCleanState();
+        NavigationManager.showToast('Account data reset to fresh state', 'info');
       },
       getState: () => stateManager.getState(),
     };

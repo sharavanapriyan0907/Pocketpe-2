@@ -6,7 +6,7 @@
    ========================================================================== */
 
 import { stateManager } from '../state.js';
-import { DEMO_MERCHANTS } from '../config.js';
+import { KNOWN_MERCHANT_DIRECTORY } from '../config.js';
 import { CategoryEngine } from '../engines/categoryEngine.js';
 import { WalletEngine } from '../engines/walletEngine.js';
 import { TransactionEngine } from '../engines/transactionEngine.js';
@@ -75,14 +75,32 @@ export class PayView {
   static render() {
     if (!this.container) return;
 
-    const isDev = devModeService.isDevMode();
+    // Extract actual recent payees from user's actual transactions
+    const allTransactions = stateManager.getTransactions();
+    const debitTxs = allTransactions.filter((t) => t.type === 'debit' && t.merchantName);
+    const seenPayees = new Set();
+    const recentPayees = [];
+
+    for (const tx of debitTxs) {
+      const key = (tx.upiId || tx.merchantName).toLowerCase();
+      if (!seenPayees.has(key)) {
+        seenPayees.add(key);
+        recentPayees.push({
+          id: tx.id,
+          name: tx.merchantName,
+          upiId: tx.upiId || `${key.replace(/[^a-z0-9]/g, '')}@upi`,
+          category: tx.category || 'General',
+          icon: tx.icon || '🏪',
+          lastAmount: tx.amount,
+        });
+      }
+      if (recentPayees.length >= 8) break;
+    }
 
     this.container.innerHTML = `
       <div class="section-header">
         <h2 class="h2">Scan & Pay</h2>
-        ${isDev
-          ? '<span class="dev-mode-pill">🛠️ Dev Mode</span>'
-          : '<span class="badge badge-success" style="font-size: 0.65rem;">● UPI 2.0 Ready</span>'}
+        <span class="badge badge-success" style="font-size: 0.65rem;">● UPI 2.0 Ready</span>
       </div>
 
       <div class="pay-responsive-grid">
@@ -146,49 +164,48 @@ export class PayView {
         </div>
 
         <div class="pay-merchants-pane">
-          <!-- Quick UPI Merchants / Contacts -->
-          <div class="demo-merchants-section">
-            <div class="title" style="display: flex; justify-content: space-between; align-items: center;">
-              <span>${isDev ? 'Demo QR Merchants (Instant Test):' : 'Recent UPI Payees'}</span>
-              <span style="font-size: 0.72rem; color: var(--text-muted);">${isDev ? 'Tap to simulate' : 'Tap to pay'}</span>
+          <!-- Recent UPI Payees from Actual Transactions -->
+          <div class="recent-payees-section">
+            <div class="title" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <span>Recent UPI Payees</span>
+              <span style="font-size: 0.72rem; color: var(--text-muted);">${recentPayees.length > 0 ? 'Tap to pay again' : ''}</span>
             </div>
-            <div class="merchants-scroll-list">
-              ${DEMO_MERCHANTS.map((m) => {
-                const risk = FraudEngine.evaluateUpiRisk(m.upiId);
-                const isHigh = risk.level === RISK_LEVELS.HIGH;
-                const isCaution = risk.level === RISK_LEVELS.CAUTION;
+            ${recentPayees.length === 0 ? `
+              <div class="clean-empty-payees" style="padding: 24px 16px; text-align: center; background: rgba(255, 255, 255, 0.02); border-radius: var(--radius-md); border: 1px dashed rgba(255, 255, 255, 0.08);">
+                <div style="font-size: 1.8rem; margin-bottom: 6px;">⚡</div>
+                <div style="font-size: var(--text-sm); font-weight: 700; color: var(--text-primary);">No Recent Payees</div>
+                <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; line-height: 1.4;">
+                  Scan any standard UPI QR code or enter a UPI ID to initiate your first payment.
+                </p>
+              </div>
+            ` : `
+              <div class="merchants-scroll-list">
+                ${recentPayees.map((m) => {
+                  const risk = FraudEngine.evaluateUpiRisk(m.upiId);
+                  const isHigh = risk.level === RISK_LEVELS.HIGH;
+                  const isCaution = risk.level === RISK_LEVELS.CAUTION;
 
-                return `
-                <div class="merchant-item-card ${isHigh ? 'merchant-item-card-risk' : ''}" data-merchant-id="${m.id}">
-                  <div class="merchant-info">
-                    <div class="merchant-avatar">${m.icon}</div>
-                    <div class="merchant-meta">
-                      <div style="display: flex; align-items: center; gap: 6px;">
-                        <h4>${m.name}</h4>
-                        ${isHigh || isCaution ? FraudModal.renderRiskBadgeHtml(m.upiId, false) : ''}
+                  return `
+                  <div class="merchant-item-card ${isHigh ? 'merchant-item-card-risk' : ''}" data-payee-upi="${m.upiId}" data-payee-name="${encodeURIComponent(m.name)}" data-payee-amount="${m.lastAmount}">
+                    <div class="merchant-info">
+                      <div class="merchant-avatar">${m.icon}</div>
+                      <div class="merchant-meta">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                          <h4>${m.name}</h4>
+                          ${isHigh || isCaution ? FraudModal.renderRiskBadgeHtml(m.upiId, false) : ''}
+                        </div>
+                        <p>${m.category} • <span class="mono" style="font-size: 0.7rem;">${m.upiId || ''}</span></p>
                       </div>
-                      <p>${m.category} • <span class="mono" style="font-size: 0.7rem;">${m.upiId || ''}</span></p>
+                    </div>
+                    <div class="merchant-amount-tag">
+                      ${WalletEngine.formatRupee(m.lastAmount)}
                     </div>
                   </div>
-                  <div class="merchant-amount-tag">
-                    ${WalletEngine.formatRupee(m.defaultAmount)}
-                  </div>
-                </div>
-              `;
-              }).join('')}
-            </div>
-          </div>
-
-          <!-- Insufficient Balance Test Shortcut (DEVELOPER MODE ONLY) -->
-          ${isDev ? `
-            <div class="card" style="padding: 12px 16px; background: rgba(245, 158, 11, 0.05); border: 1.5px dashed #f59e0b; display: flex; align-items: center; justify-content: space-between; margin-top: 12px;">
-              <div>
-                <div style="font-size: var(--text-xs); font-weight: 700; color: #f59e0b;">🧪 Test Payment Protection Shield</div>
-                <div style="font-size: 0.72rem; color: var(--text-muted);">Force deficit: pay ₹2,500 from Transport (low balance)</div>
+                `;
+                }).join('')}
               </div>
-              <button class="btn btn-sm btn-secondary" id="btn-test-deficit" style="width: auto;">Test Shield</button>
-            </div>
-          ` : ''}
+            `}
+          </div>
         </div>
       </div>
     `;
@@ -197,17 +214,17 @@ export class PayView {
   }
 
   static bindEvents() {
-    // 1. Merchant list tap (simulates real UPI QR scan payload)
+    // 1. Payee item tap -> opens payment flow for that actual payee
     const cards = this.container.querySelectorAll('.merchant-item-card');
     cards.forEach((card) => {
       card.addEventListener('click', () => {
-        const mId = card.getAttribute('data-merchant-id');
-        const merchant = DEMO_MERCHANTS.find((m) => m.id === mId);
-        if (merchant) {
+        const upiId = card.getAttribute('data-payee-upi');
+        const name = decodeURIComponent(card.getAttribute('data-payee-name') || '');
+        const amount = card.getAttribute('data-payee-amount');
+        if (upiId && name) {
           SoundEngine.playTap();
-          const mccParam = merchant.mcc ? `&mc=${merchant.mcc}` : '';
-          const amParam = merchant.defaultAmount ? `&am=${merchant.defaultAmount}` : '';
-          const qrPayload = `upi://pay?pa=${merchant.upiId}&pn=${encodeURIComponent(merchant.name)}${mccParam}${amParam}&cu=INR`;
+          const amParam = amount ? `&am=${amount}` : '';
+          const qrPayload = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(name)}${amParam}&cu=INR`;
           this.handleScannedQrPayload(qrPayload);
         }
       });
@@ -1103,7 +1120,7 @@ export class PayView {
     // 1. Resolve UPI ID
     let resolvedUpiId = upiId;
     if (!resolvedUpiId) {
-      const match = DEMO_MERCHANTS.find((m) => m.name.toLowerCase() === merchantName.toLowerCase());
+      const match = KNOWN_MERCHANT_DIRECTORY.find((m) => m.name.toLowerCase() === merchantName.toLowerCase());
       if (match && match.upiId) {
         resolvedUpiId = match.upiId;
       } else if (merchantName.includes('@')) {

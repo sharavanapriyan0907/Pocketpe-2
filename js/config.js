@@ -7,7 +7,7 @@ export const APP_CONFIG = {
   APP_VERSION: '2.4.0',
   TAGLINE: 'Every rupee has a purpose.',
   STORAGE_KEYS: {
-    APP_STATE: 'pocketpe_app_state_v2',
+    APP_STATE: 'pocketpe_app_state_v3',
     THEME: 'pocketpe_theme',
     ACCENT: 'pocketpe_accent',
     LEARNED_MERCHANTS: 'pocketpe_learned_merchants',
@@ -44,7 +44,7 @@ export const INITIAL_WALLETS = [
     name: 'Food',
     icon: '🍔',
     color: '#f59e0b',
-    balance: 2000,
+    balance: 0,
     targetAmount: 2500,
     monthlyLimit: 2500,
     allocationPercentage: 25,
@@ -57,10 +57,10 @@ export const INITIAL_WALLETS = [
     name: 'Transport',
     icon: '🚗',
     color: '#06b6d4',
-    balance: 800,
+    balance: 0,
     targetAmount: 1000,
     monthlyLimit: 1200,
-    allocationPercentage: 10,
+    allocationPercentage: 15,
     category: 'Transport & Fuel',
     isFreeMoney: false,
     frequency: 'Every time I receive money',
@@ -70,7 +70,7 @@ export const INITIAL_WALLETS = [
     name: 'Savings',
     icon: '💰',
     color: '#10b981',
-    balance: 2500,
+    balance: 0,
     targetAmount: 2500,
     monthlyLimit: 0,
     allocationPercentage: 20,
@@ -83,7 +83,7 @@ export const INITIAL_WALLETS = [
     name: 'College',
     icon: '🎓',
     color: '#8b5cf6',
-    balance: 1500,
+    balance: 0,
     targetAmount: 2000,
     monthlyLimit: 2000,
     allocationPercentage: 15,
@@ -96,7 +96,7 @@ export const INITIAL_WALLETS = [
     name: 'Friends',
     icon: '🤝',
     color: '#ec4899',
-    balance: 1000,
+    balance: 0,
     targetAmount: 1500,
     monthlyLimit: 1500,
     allocationPercentage: 10,
@@ -109,7 +109,7 @@ export const INITIAL_WALLETS = [
     name: 'Medical',
     icon: '💊',
     color: '#ef4444',
-    balance: 1500,
+    balance: 0,
     targetAmount: 2000,
     monthlyLimit: 2000,
     allocationPercentage: 10,
@@ -122,75 +122,21 @@ export const INITIAL_WALLETS = [
     name: 'Free Money',
     icon: '✨',
     color: '#3b82f6',
-    balance: 1200,
+    balance: 0,
     targetAmount: 0,
     monthlyLimit: 0,
-    allocationPercentage: 10,
+    allocationPercentage: 5,
     category: 'Unallocated Cushion',
     isFreeMoney: true,
     frequency: 'Unallocated reserve',
   },
 ];
 
-export const INITIAL_TRANSACTIONS = [
-  {
-    id: 'tx_101',
-    merchantName: 'ABC Restaurant',
-    amount: 280,
-    type: 'debit',
-    category: 'Food & Dining',
-    walletId: 'wallet_food',
-    date: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    status: 'Completed',
-    note: 'Lunch with colleagues',
-  },
-  {
-    id: 'tx_102',
-    merchantName: 'City Bus Metro',
-    amount: 40,
-    type: 'debit',
-    category: 'Transport & Fuel',
-    walletId: 'wallet_transport',
-    date: new Date(Date.now() - 4 * 3600 * 1000).toISOString(),
-    status: 'Completed',
-    note: 'Daily commute',
-  },
-  {
-    id: 'tx_103',
-    merchantName: 'College Canteen',
-    amount: 120,
-    type: 'debit',
-    category: 'Food & Dining',
-    walletId: 'wallet_food',
-    date: new Date(Date.now() - 22 * 3600 * 1000).toISOString(),
-    status: 'Completed',
-    note: 'Snacks & chai',
-  },
-  {
-    id: 'tx_104',
-    merchantName: 'Sent to Friend (Rohan)',
-    amount: 500,
-    type: 'debit',
-    category: 'Friends & Social',
-    walletId: 'wallet_friends',
-    date: new Date(Date.now() - 26 * 3600 * 1000).toISOString(),
-    status: 'Completed',
-    note: 'Shared weekend dinner split',
-  },
-  {
-    id: 'tx_105',
-    merchantName: 'City Pharmacy',
-    amount: 180,
-    type: 'debit',
-    category: 'Health & Wellness',
-    walletId: 'wallet_free',
-    date: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-    status: 'Completed',
-    note: 'Vitamin supplements',
-  },
-];
+export const INITIAL_TRANSACTIONS = [];
 
-export const DEMO_MERCHANTS = [
+export const INITIAL_COMMITMENTS = [];
+
+export const KNOWN_MERCHANT_DIRECTORY = [
   {
     id: 'm_abc_rest',
     name: 'ABC Restaurant',
@@ -292,27 +238,28 @@ export const DEMO_MERCHANTS = [
   },
   {
     id: 'm_electricity_refund',
-    name: 'Electricity Helpdesk (Scam Test)',
+    name: 'Electricity Helpdesk',
     upiId: 'powerbill.helpdesk@ybl',
     category: 'Housing',
     defaultAmount: 2450,
     icon: '⚠️',
     mcc: '4900',
-    description: 'Reported: Fake electricity disconnection scam',
+    description: 'Reported: Unverified utility collection handle',
     matchingWallet: 'wallet_free',
   },
   {
     id: 'm_lottery_scam',
-    name: 'Lucky Draw Office (Scam Test)',
+    name: 'Lucky Draw Office',
     upiId: 'reward.claim981@okaxis',
     category: 'General Expense',
     defaultAmount: 999,
     icon: '🚨',
     mcc: '0000',
-    description: 'Reported: Lottery processing fee fraud',
+    description: 'Reported: High-risk fee collection handle',
     matchingWallet: 'wallet_free',
   },
 ];
+export const DIRECTORY_MERCHANTS = KNOWN_MERCHANT_DIRECTORY;
 
 export const INITIAL_FRAUD_DATA = {
   // Threshold: min 5 reports to trigger community risk badge
@@ -387,117 +334,12 @@ export const INITIAL_FRAUD_DATA = {
   appeals: [],
 };
 
-export const INITIAL_COLLECT_REQUESTS = [
-  {
-    id: 'req_scam_01',
-    upiId: 'powerbill.helpdesk@ybl',
-    requesterName: 'Electricity Board Support Desk',
-    amount: 2450,
-    note: '🚨 Urgent: Unpaid disconnection clearance fee',
-    date: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    status: 'pending',
-  },
-  {
-    id: 'req_friend_02',
-    upiId: 'rohan.sharma@okhdfcbank',
-    requesterName: 'Rohan Sharma',
-    amount: 320,
-    note: 'Hostel midnight Maggi & snacks split 🍜',
-    date: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-    status: 'pending',
-  },
-];
+export const INITIAL_COLLECT_REQUESTS = [];
 
 export const INITIAL_SPLIT_DATA = {
-  groups: [
-    {
-      id: 'grp_hostel_302',
-      name: 'Hostel Room 302 🍕',
-      category: 'Housing',
-      icon: '🏠',
-      createdBy: 'usr_001',
-      createdAt: new Date(Date.now() - 10 * 86400000).toISOString(),
-      // Phase 2 readiness
-      phase2Pool: {
-        enabled: false,
-        targetPoolAmount: 0,
-        poolBalance: 0,
-        refundPolicy: 'equal',
-      },
-    },
-    {
-      id: 'grp_goa_trip',
-      name: 'Goa Weekend Trip 🏖️',
-      category: 'Travel',
-      icon: '✈️',
-      createdBy: 'usr_001',
-      createdAt: new Date(Date.now() - 4 * 86400000).toISOString(),
-      phase2Pool: {
-        enabled: false,
-        targetPoolAmount: 0,
-        poolBalance: 0,
-        refundPolicy: 'equal',
-      },
-    },
-  ],
-  groupMembers: [
-    // Hostel Room 302
-    { id: 'mem_01', groupId: 'grp_hostel_302', userId: 'usr_001', name: 'You (Sharath)', upiId: 'sharath@okhdfcbank', phone: '9876543210', isCurrentUser: true },
-    { id: 'mem_02', groupId: 'grp_hostel_302', userId: 'usr_rohan', name: 'Rohan Sharma', upiId: 'rohan.sharma@okhdfcbank', phone: '9876543211', isCurrentUser: false },
-    { id: 'mem_03', groupId: 'grp_hostel_302', userId: 'usr_priya', name: 'Priya Patel', upiId: 'priya.patel@okicici', phone: '9876543212', isCurrentUser: false },
-    { id: 'mem_04', groupId: 'grp_hostel_302', userId: 'usr_aditya', name: 'Aditya Verma', upiId: 'aditya.v@oksbi', phone: '9876543213', isCurrentUser: false },
-
-    // Goa Trip
-    { id: 'mem_g01', groupId: 'grp_goa_trip', userId: 'usr_001', name: 'You (Sharath)', upiId: 'sharath@okhdfcbank', phone: '9876543210', isCurrentUser: true },
-    { id: 'mem_g02', groupId: 'grp_goa_trip', userId: 'usr_rohan', name: 'Rohan Sharma', upiId: 'rohan.sharma@okhdfcbank', phone: '9876543211', isCurrentUser: false },
-    { id: 'mem_g03', groupId: 'grp_goa_trip', userId: 'usr_priya', name: 'Priya Patel', upiId: 'priya.patel@okicici', phone: '9876543212', isCurrentUser: false },
-  ],
-  expenses: [
-    {
-      id: 'exp_01',
-      groupId: 'grp_hostel_302',
-      description: 'Hostel Wi-Fi Bill (Nov)',
-      amount: 1200,
-      paidBy: 'mem_01', // You paid
-      splitType: 'equal',
-      createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
-      shares: [
-        { memberId: 'mem_01', shareAmount: 300 },
-        { memberId: 'mem_02', shareAmount: 300 },
-        { memberId: 'mem_03', shareAmount: 300 },
-        { memberId: 'mem_04', shareAmount: 300 },
-      ],
-    },
-    {
-      id: 'exp_02',
-      groupId: 'grp_hostel_302',
-      description: 'Pizza & Cold Drinks',
-      amount: 800,
-      paidBy: 'mem_02', // Rohan paid
-      splitType: 'equal',
-      createdAt: new Date(Date.now() - 1 * 86400000).toISOString(),
-      shares: [
-        { memberId: 'mem_01', shareAmount: 200 },
-        { memberId: 'mem_02', shareAmount: 200 },
-        { memberId: 'mem_03', shareAmount: 200 },
-        { memberId: 'mem_04', shareAmount: 200 },
-      ],
-    },
-    {
-      id: 'exp_g01',
-      groupId: 'grp_goa_trip',
-      description: 'Beach Shack Seafood Dinner',
-      amount: 2100,
-      paidBy: 'mem_g01', // You paid
-      splitType: 'equal',
-      createdAt: new Date(Date.now() - 2 * 86400000).toISOString(),
-      shares: [
-        { memberId: 'mem_g01', shareAmount: 700 },
-        { memberId: 'mem_g02', shareAmount: 700 },
-        { memberId: 'mem_g03', shareAmount: 700 },
-      ],
-    },
-  ],
+  groups: [],
+  groupMembers: [],
+  expenses: [],
   settlements: [],
 };
 

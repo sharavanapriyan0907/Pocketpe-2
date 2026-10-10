@@ -22,6 +22,8 @@ import { supabaseService } from './services/supabaseService.js';
 import { AuthModal } from './ui/authModal.js';
 import { SupabaseConfigModal } from './ui/supabaseConfigModal.js';
 import { EditProfileModal } from './ui/editProfileModal.js';
+import { CommitmentModal } from './ui/commitmentModal.js';
+import { FundingModal } from './ui/fundingModal.js';
 import { UnitTests } from './tests/unitTests.js';
 import { devModeService } from './services/devModeService.js';
 
@@ -29,43 +31,56 @@ class App {
   static init() {
     console.log('🚀 Initializing PocketPe: Purpose-Led Money App...');
 
+    // Expose developer test runner in dev console for non-UI test execution
+    window.UnitTests = UnitTests;
+
+    const safeInit = (name, fn) => {
+      try {
+        fn();
+      } catch (err) {
+        console.error(`Error initializing ${name}:`, err);
+      }
+    };
+
     // 0. Initialize Developer Mode Service
-    devModeService.init();
+    safeInit('devModeService', () => devModeService.init());
 
     // 1. Initialize Theme & Audio
-    ThemeManager.init();
+    safeInit('ThemeManager', () => ThemeManager.init());
 
     // 2. Initialize Navigation
-    NavigationManager.init();
+    safeInit('NavigationManager', () => NavigationManager.init());
 
     // 3. Initialize Tab Views
-    HomeView.init();
-    WalletsView.init();
-    PayView.init();
-    ActivityView.init();
-    ProfileView.init();
+    safeInit('HomeView', () => HomeView.init());
+    safeInit('WalletsView', () => WalletsView.init());
+    safeInit('PayView', () => PayView.init());
+    safeInit('ActivityView', () => ActivityView.init());
+    safeInit('ProfileView', () => ProfileView.init());
 
     // 4. Initialize Modals
-    SplitView.init();
-    ReceiveModal.init();
-    MoveModal.init();
-    OnboardingManager.init();
-    FraudModal.init();
-    CollectModal.init();
-    SplitBillView.init();
-    AuthModal.init();
-    SupabaseConfigModal.init();
-    EditProfileModal.init();
+    safeInit('SplitView', () => SplitView.init());
+    safeInit('ReceiveModal', () => ReceiveModal.init());
+    safeInit('MoveModal', () => MoveModal.init());
+    safeInit('OnboardingManager', () => OnboardingManager.init());
+    safeInit('FraudModal', () => FraudModal.init());
+    safeInit('CollectModal', () => CollectModal.init());
+    safeInit('SplitBillView', () => SplitBillView.init());
+    safeInit('AuthModal', () => AuthModal.init());
+    safeInit('SupabaseConfigModal', () => SupabaseConfigModal.init());
+    safeInit('EditProfileModal', () => EditProfileModal.init());
+    safeInit('CommitmentModal', () => CommitmentModal.init());
+    safeInit('FundingModal', () => FundingModal.init());
 
     // 5. Initialize Supabase Auth Session
-    this.initSupabaseAuth();
+    safeInit('initSupabaseAuth', () => this.initSupabaseAuth());
 
     // 6. Initialize Desktop Stage Controls
-    this.setupDesktopControls();
+    safeInit('setupDesktopControls', () => this.setupDesktopControls());
 
     // 7. Run Automated Unit Tests on Startup if in Developer Mode
     if (devModeService.isDevMode()) {
-      UnitTests.runAll();
+      safeInit('UnitTests', () => UnitTests.runAll());
     }
 
     console.log('✨ PocketPe is ready. Every rupee has a purpose.');
@@ -244,14 +259,6 @@ class App {
       });
     }
 
-    // Desktop Run Tests
-    const desktopTestsBtn = document.getElementById('btn-desktop-tests');
-    if (desktopTestsBtn) {
-      desktopTestsBtn.addEventListener('click', () => {
-        UnitTests.showTestResultsModal();
-      });
-    }
-
     // Desktop Supabase Auth / Account Button
     const desktopAuthBtn = document.getElementById('btn-desktop-auth');
     if (desktopAuthBtn) {
@@ -264,22 +271,14 @@ class App {
         SoundEngine.playTap();
       });
     }
-
-    // Desktop Reset Demo Data
-    const desktopResetBtn = document.getElementById('btn-desktop-reset');
-    if (desktopResetBtn) {
-      desktopResetBtn.addEventListener('click', () => {
-        if (confirm('Reset PocketPe prototype demo data back to default?')) {
-          stateManager.resetToDemoData();
-          SoundEngine.playSuccess();
-          NavigationManager.showToast('Demo data reset to fresh state', 'success');
-        }
-      });
-    }
   }
 }
 
 // Start application when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    App.init();
+  });
+} else {
   App.init();
-});
+}

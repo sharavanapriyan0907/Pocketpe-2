@@ -53,17 +53,7 @@ export class AuthModal {
         </p>
       </div>
 
-      <!-- Supabase Configuration Status Banner (DEVELOPER MODE ONLY) -->
-      ${isDev && !isConfigured ? `
-        <div class="card" style="padding: 10px 12px; background: rgba(245, 158, 11, 0.1); border: 1px solid #f59e0b; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
-          <div style="font-size: 0.76rem; color: var(--text-secondary);">
-            <strong style="color: #f59e0b;">⚙️ Dev Setup:</strong> Connect Supabase Project URL & Anon Key to authenticate.
-          </div>
-          <button class="btn btn-sm btn-ghost" id="btn-auth-open-config" style="white-space: nowrap; font-size: 0.72rem; padding: 4px 8px;">
-            Configure
-          </button>
-        </div>
-      ` : ''}
+
 
       <!-- Tab Switcher (Log In / Sign Up) -->
       <div style="display: flex; background: var(--bg-surface-secondary); padding: 4px; border-radius: var(--radius-md); margin-bottom: 14px;">

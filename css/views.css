@@ -594,14 +594,14 @@
   z-index: 3;
 }
 
-/* Demo QR Quick Selector */
-.demo-merchants-section {
+/* Recent Payees Quick Selector */
+.recent-payees-section {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.demo-merchants-section .title {
+.recent-payees-section .title {
   font-size: var(--text-sm);
   font-weight: 700;
   color: var(--text-secondary);
@@ -1325,4 +1325,41 @@
     gap: 16px;
   }
 }
+
+/* ==========================================================================
+   PRODUCTION CONSUMER FINANCIAL COMMITMENT & SHORTFALL STYLES
+   ========================================================================== */
+.shortfall-alert-card {
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.shortfall-alert-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.12);
+}
+
+.commitment-home-card {
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+  cursor: pointer;
+}
+
+.commitment-home-card:hover {
+  transform: translateY(-1.5px);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.funding-option-btn {
+  transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.funding-option-btn:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--accent-primary) !important;
+}
+
+.clean-empty-payees {
+  animation: fadeIn 0.3s ease-out;
+}
+
 

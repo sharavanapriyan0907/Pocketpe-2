@@ -3,7 +3,7 @@
    ========================================================================== */
 
 import { stateManager } from '../state.js';
-import { DEMO_MERCHANTS } from '../config.js';
+import { KNOWN_MERCHANT_DIRECTORY } from '../config.js';
 import { getCategoryFromMcc, getWalletForCategory } from './upiQrEngine.js';
 
 export class CategoryEngine {
@@ -126,8 +126,8 @@ export class CategoryEngine {
       };
     }
 
-    // 3. Check Seeded Demo Merchants database
-    const seeded = DEMO_MERCHANTS.find(
+    // 3. Check Known Merchant Directory database
+    const seeded = KNOWN_MERCHANT_DIRECTORY.find(
       (m) => m.name.toLowerCase() === lowerName || lowerName.includes(m.name.toLowerCase())
     );
     if (seeded) {

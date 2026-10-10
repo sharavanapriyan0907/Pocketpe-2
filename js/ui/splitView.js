@@ -12,7 +12,7 @@ import { SoundEngine } from './sound.js';
 export class SplitView {
   static init() {
     this.modal = document.getElementById('modal-split-rules');
-    this.sampleAmount = 10000;
+    this.calculatorAmount = 10000;
     this.splits = {};
 
     if (!this.modal) return;
@@ -61,16 +61,16 @@ export class SplitView {
         <p class="subtitle">Set rules for incoming funds. Every rupee has a purpose.</p>
       </div>
 
-      <!-- Sample Incoming Amount Preview Pill -->
+      <!-- Incoming Amount Preview Pill -->
       <div class="card" style="padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;">
         <div>
-          <span style="font-size: var(--text-xs); color: var(--text-muted); font-weight: 600;">SAMPLE DEPOSIT PREVIEW</span>
-          <div style="font-size: var(--text-lg); font-weight: 800; color: var(--text-primary);">${WalletEngine.formatRupee(this.sampleAmount)}</div>
+          <span style="font-size: var(--text-xs); color: var(--text-muted); font-weight: 600;">DEPOSIT ALLOCATION CALCULATOR</span>
+          <div style="font-size: var(--text-lg); font-weight: 800; color: var(--text-primary);">${WalletEngine.formatRupee(this.calculatorAmount)}</div>
         </div>
         <div style="display: flex; gap: 4px;">
-          <button class="pill-btn ${this.sampleAmount === 5000 ? 'active' : ''}" data-sample="5000">₹5k</button>
-          <button class="pill-btn ${this.sampleAmount === 10000 ? 'active' : ''}" data-sample="10000">₹10k</button>
-          <button class="pill-btn ${this.sampleAmount === 25000 ? 'active' : ''}" data-sample="25000">₹25k</button>
+          <button class="pill-btn ${this.calculatorAmount === 5000 ? 'active' : ''}" data-amount="5000">₹5k</button>
+          <button class="pill-btn ${this.calculatorAmount === 10000 ? 'active' : ''}" data-amount="10000">₹10k</button>
+          <button class="pill-btn ${this.calculatorAmount === 25000 ? 'active' : ''}" data-amount="25000">₹25k</button>
         </div>
       </div>
 
@@ -92,7 +92,7 @@ export class SplitView {
       <div class="split-rules-card">
         ${wallets.map((wallet) => {
           const pct = this.splits[wallet.id] !== undefined ? this.splits[wallet.id] : 0;
-          const calculatedRupees = Math.round((pct / 100) * this.sampleAmount);
+          const calculatedRupees = Math.round((pct / 100) * this.calculatorAmount);
 
           return `
             <div class="split-rule-row">
@@ -141,10 +141,10 @@ export class SplitView {
       });
     });
 
-    // Sample amount toggle
-    body.querySelectorAll('[data-sample]').forEach((btn) => {
+    // Calculator amount toggle
+    body.querySelectorAll('[data-amount]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        this.sampleAmount = Number(btn.getAttribute('data-sample'));
+        this.calculatorAmount = Number(btn.getAttribute('data-amount'));
         SoundEngine.playTap();
         this.render();
       });

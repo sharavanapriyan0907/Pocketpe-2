@@ -9,6 +9,7 @@ import { FraudEngine, RISK_LEVELS } from '../engines/fraudEngine.js';
 import { SplitEngine } from '../engines/splitEngine.js';
 import { UpiQrEngine, parseUpiQr, getCategoryFromMcc, getPocketPeCategory, getWalletForCategory } from '../engines/upiQrEngine.js';
 import { CategoryEngine } from '../engines/categoryEngine.js';
+import { CommitmentEngine, EXECUTION_STATUSES } from '../engines/commitmentEngine.js';
 import { supabaseService } from '../services/supabaseService.js';
 import { stateManager } from '../state.js';
 import { NavigationManager } from '../ui/navigation.js';
@@ -753,8 +754,172 @@ export class UnitTests {
         stateManager.loadUserScopedData(originalUserState.id);
         stateManager.notify('auth:changed', stateManager.state.user);
       } else {
-        stateManager.resetToDemoData();
+        stateManager.resetToCleanState();
       }
+    })();
+
+    // =========================================================================
+    // FEATURE 6: FINANCIAL COMMITMENTS, SHORTFALL ALERTS & CLEAN CONSUMER STATE
+    // =========================================================================
+
+    // Test: User-Created Commitments & Free-Form Custom Name
+    (() => {
+      const commitmentData = {
+        name: 'College fees',
+        payee: 'Apex University',
+        amount: 1500,
+        dueDate: '2026-10-25',
+        frequency: 'monthly',
+        category: 'education',
+        walletId: 'wallet_college',
+        notes: 'Semester exam fee',
+      };
+
+      const commitment = stateManager.addCommitment(commitmentData);
+      assert(
+        'Commitments: User creates custom-named financial commitment without predetermined templates',
+        commitment &&
+          commitment.id &&
+          commitment.name === 'College fees' &&
+          commitment.payee === 'Apex University' &&
+          commitment.amount === 1500 &&
+          commitment.walletId === 'wallet_college',
+        `Created: ${commitment?.name}, Amount: ₹${commitment?.amount}`
+      );
+
+      // Clean up test commitment
+      if (commitment?.id) {
+        stateManager.deleteCommitment(commitment.id);
+      }
+    })();
+
+    // Test: Shortfall Calculation Logic
+    (() => {
+      const mockWallets = [
+        { id: 'w1', name: 'Housing', balance: 500 },
+        { id: 'w2', name: 'College', balance: 2000 },
+      ];
+
+      const underfundedCommitment = { id: 'c1', name: 'Rent', amount: 1500, walletId: 'w1' };
+      const fundedCommitment = { id: 'c2', name: 'Fees', amount: 1500, walletId: 'w2' };
+
+      const funding1 = CommitmentEngine.calculateFunding(underfundedCommitment, mockWallets);
+      const funding2 = CommitmentEngine.calculateFunding(fundedCommitment, mockWallets);
+
+      assert(
+        'Shortfall Engine: Accurately calculates shortfall (Math.max(0, amount - balance))',
+        funding1.shortfall === 1000 &&
+          funding1.hasSufficientFunds === false &&
+          funding1.availableBalance === 500 &&
+          funding2.shortfall === 0 &&
+          funding2.hasSufficientFunds === true &&
+          funding2.availableBalance === 2000,
+        `Underfunded shortfall: ₹${funding1.shortfall}, Funded shortfall: ₹${funding2.shortfall}`
+      );
+    })();
+
+    // Test: Intelligent Home-Page Alerts Generation
+    (() => {
+      const mockWallets = [
+        { id: 'w1', name: 'Living Expenses', balance: 400 },
+        { id: 'w2', name: 'College & Education', balance: 3000 },
+      ];
+
+      // Commitment 1: Insufficient funds (Shortfall = 1100)
+      const c1 = { id: 'c1', name: 'Monthly electricity', amount: 1500, walletId: 'w1', dueDate: '2026-10-20', status: 'PLANNED' };
+      // Commitment 2: Sufficient funds (Shortfall = 0)
+      const c2 = { id: 'c2', name: 'College fees', amount: 1500, walletId: 'w2', dueDate: '2026-10-22', status: 'PLANNED' };
+
+      const alerts = CommitmentEngine.generateHomeAlerts([c1, c2], mockWallets);
+
+      assert(
+        'Intelligent Alerts: Alert triggers ONLY when shortfall > 0, zero false alerts when funds are sufficient',
+        alerts.length === 1 &&
+          alerts[0].commitmentId === 'c1' &&
+          alerts[0].shortfall === 1100 &&
+          alerts[0].availableBalance === 400 &&
+          alerts[0].title === 'Insufficient funds for your upcoming payment.',
+        `Generated ${alerts.length} alert(s), shortfall: ₹${alerts[0]?.shortfall}`
+      );
+    })();
+
+    // Test: Zero Artificial Alerts When Empty
+    (() => {
+      const emptyAlerts = CommitmentEngine.generateHomeAlerts([], []);
+      assert(
+        'Clean Empty State: Zero artificial alerts generated when no commitments exist',
+        Array.isArray(emptyAlerts) && emptyAlerts.length === 0,
+        `Alert count: ${emptyAlerts.length}`
+      );
+    })();
+
+    // Test: Separate Payment Planning from Payment Execution
+    (() => {
+      // 1. Initial wallet state
+      const initialWallet = stateManager.getWallets().find((w) => w.id === 'wallet_college');
+      const startBalance = initialWallet ? initialWallet.balance : 0;
+
+      // 2. Add commitment - balance must NOT change!
+      const commitment = stateManager.addCommitment({
+        name: 'Tuition deposit',
+        amount: 500,
+        walletId: 'wallet_college',
+        dueDate: '2026-11-01',
+        frequency: 'monthly',
+      });
+
+      const walletAfterAdd = stateManager.getWallets().find((w) => w.id === 'wallet_college');
+      const addDidNotDebit = walletAfterAdd.balance === startBalance;
+
+      // 3. Fund wallet so execution can succeed
+      stateManager.depositMoney('wallet_college', 1000, 'bank', 'Deposit for tuition');
+      const walletAfterDeposit = stateManager.getWallets().find((w) => w.id === 'wallet_college');
+
+      // 4. Explicitly execute payment
+      const executionResult = stateManager.executeCommitmentPayment(commitment.id, {
+        reference: 'UPI/MANDATE/TXN123',
+      });
+
+      const walletAfterExec = stateManager.getWallets().find((w) => w.id === 'wallet_college');
+      const updatedCommitment = stateManager.getCommitment(commitment.id);
+
+      assert(
+        'Planning vs Execution: Schedule creation does not debit money; only explicit user execution transfers funds and advances due date',
+        addDidNotDebit &&
+          executionResult.success &&
+          walletAfterExec.balance === walletAfterDeposit.balance - 500 &&
+          updatedCommitment.dueDate === '2026-12-01',
+        `Pre-exec: ₹${walletAfterDeposit.balance}, Post-exec: ₹${walletAfterExec.balance}, New Due Date: ${updatedCommitment?.dueDate}`
+      );
+
+      // Clean up test commitment and reset test balance
+      if (commitment?.id) {
+        stateManager.deleteCommitment(commitment.id);
+      }
+      stateManager.resetToCleanState();
+    })();
+
+    // Test: Prohibited Prototype Words Audit
+    (() => {
+      const prohibitedWords = ['Demo', 'Demo Payment', 'Sample Loan', 'Example EMI', 'Test Transaction', 'Mock Payment'];
+      const pageHtml = document.body ? document.body.innerHTML : '';
+      let violationFound = false;
+      let violatedWord = '';
+
+      for (const phrase of prohibitedWords) {
+        const regex = new RegExp('\\b' + phrase.replace(/ /g, '\\s+') + '\\b', 'i');
+        if (regex.test(pageHtml)) {
+          violationFound = true;
+          violatedWord = phrase;
+          break;
+        }
+      }
+
+      assert(
+        'Production Quality Guard: Zero occurrences of prohibited prototype labels in customer interface',
+        !violationFound,
+        violationFound ? `Found prohibited string: "${violatedWord}"` : 'All customer UI templates clean'
+      );
     })();
 
     const endTime = performance.now();
@@ -781,12 +946,25 @@ export class UnitTests {
    */
   static showTestResultsModal() {
     const report = this.runAll();
-    const modal = document.getElementById('modal-unit-tests');
-    if (!modal) return;
+    let modal = document.getElementById('modal-unit-tests');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'modal-unit-tests';
+      modal.className = 'bottom-sheet';
+      modal.innerHTML = `
+        <div class="sheet-overlay" data-close-modal="modal-unit-tests"></div>
+        <div class="sheet-content">
+          <div class="sheet-drag-handle"></div>
+          <div class="sheet-body"></div>
+          <div class="sheet-footer"></div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
 
     const body = modal.querySelector('.sheet-body');
     const footer = modal.querySelector('.sheet-footer');
-    if (!body || !footer) return;
+    if (!body || !footer) return report;
 
     body.innerHTML = `
       <div style="text-align: center; margin-bottom: 14px;">

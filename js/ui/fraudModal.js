@@ -27,7 +27,11 @@ export class FraudModal {
   /**
    * Open the Report Modal for a specific UPI ID
    */
-  static openReportModal(upiId, displayName = '') {
+  static openReportModal(upiId = '', displayName = '') {
+    if (typeof upiId === 'object' && upiId !== null) {
+      displayName = upiId.displayName || upiId.merchantName || '';
+      upiId = upiId.upiId || '';
+    }
     this.targetUpiId = (upiId || '').trim();
     this.targetDisplayName = displayName || this.targetUpiId;
 
@@ -38,24 +42,40 @@ export class FraudModal {
     const footer = modal.querySelector('.sheet-footer');
     if (!body || !footer) return;
 
-    const currentRisk = FraudEngine.evaluateUpiRisk(this.targetUpiId);
+    const hasTarget = !!this.targetUpiId;
+    const currentRisk = hasTarget ? FraudEngine.evaluateUpiRisk(this.targetUpiId) : null;
 
     body.innerHTML = `
       <div style="text-align: center; margin-bottom: 12px;">
         <div style="font-size: 2.25rem; margin-bottom: 4px;">🚨</div>
         <h3 class="h3" style="color: var(--text-primary);">Report Suspicious UPI ID</h3>
-        <p class="subtitle" style="margin-top: 2px;">Help protect other students from frauds, impersonators, and scam collect requests.</p>
+        <p class="subtitle" style="margin-top: 2px;">Help protect others from frauds, impersonators, and scam collect requests.</p>
       </div>
 
-      <!-- Target Info Card -->
-      <div class="card" style="padding: 12px 14px; background: var(--bg-subtle); display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
-        <div>
-          <div style="font-size: var(--text-xs); color: var(--text-muted); font-weight: 600;">REPORTING TARGET</div>
-          <div style="font-size: var(--text-sm); font-weight: 700; color: var(--text-primary);">${this.targetDisplayName}</div>
-          <div class="mono" style="font-size: 0.72rem; color: var(--accent-primary);">${this.targetUpiId}</div>
+      <!-- Target Info Card or Manual Entry -->
+      ${hasTarget ? `
+        <div class="card" style="padding: 12px 14px; background: var(--bg-subtle); display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+          <div>
+            <div style="font-size: var(--text-xs); color: var(--text-muted); font-weight: 600;">REPORTING TARGET</div>
+            <div style="font-size: var(--text-sm); font-weight: 700; color: var(--text-primary);">${this.targetDisplayName}</div>
+            <div class="mono" style="font-size: 0.72rem; color: var(--accent-primary);">${this.targetUpiId}</div>
+          </div>
+          <span class="badge ${this.getRiskBadgeClass(currentRisk.level)}">${currentRisk.level} RISK</span>
         </div>
-        <span class="badge ${this.getRiskBadgeClass(currentRisk.level)}">${currentRisk.level} RISK</span>
-      </div>
+      ` : `
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label" style="font-weight: 700;">
+            Suspicious Recipient UPI ID <span style="color: var(--danger);">*</span>
+          </label>
+          <input
+            type="text"
+            class="input-text mono"
+            id="report-target-upi-input"
+            placeholder="e.g. powerbill.helpdesk@ybl"
+            style="font-size: var(--text-sm);"
+          />
+        </div>
+      `}
 
       <!-- Required Reason Selection -->
       <div class="form-group" style="margin-bottom: 12px;">
@@ -81,7 +101,7 @@ export class FraudModal {
           class="input-text"
           id="report-details-input"
           rows="2"
-          placeholder="e.g. Sent an unexpected ₹2,000 refund collect request claiming to be power department..."
+          placeholder="e.g. Sent an unexpected collect request claiming to be power department..."
           style="font-size: var(--text-xs); resize: none;"
         ></textarea>
       </div>
@@ -104,13 +124,25 @@ export class FraudModal {
     const submitBtn = footer.querySelector('#btn-submit-report');
     if (submitBtn) {
       submitBtn.addEventListener('click', () => {
+        let targetToReport = this.targetUpiId;
+        if (!targetToReport) {
+          const targetInput = body.querySelector('#report-target-upi-input');
+          targetToReport = targetInput ? targetInput.value.trim() : '';
+        }
+
+        if (!targetToReport) {
+          SoundEngine.playProtectionAlert();
+          NavigationManager.showToast('Please enter the suspicious UPI ID.', 'danger');
+          return;
+        }
+
         const checkedRadio = body.querySelector('input[name="report_reason"]:checked');
         const reason = checkedRadio ? checkedRadio.value : '';
         const detailsInput = body.querySelector('#report-details-input');
         const details = detailsInput ? detailsInput.value.trim() : '';
 
         const result = FraudEngine.submitReport({
-          reportedUpiId: this.targetUpiId,
+          reportedUpiId: targetToReport,
           reason,
           details,
         });
@@ -132,7 +164,11 @@ export class FraudModal {
   /**
    * Open the detailed Risk Score Breakdown & Appeal modal
    */
-  static openRiskDetailModal(upiId, displayName = '') {
+  static openRiskDetailModal(upiId = '', displayName = '') {
+    if (typeof upiId === 'object' && upiId !== null) {
+      displayName = upiId.displayName || upiId.merchantName || '';
+      upiId = upiId.upiId || '';
+    }
     const targetUpi = (upiId || '').trim();
     const modal = document.getElementById('modal-upi-risk-detail');
     if (!modal) return;
@@ -141,118 +177,213 @@ export class FraudModal {
     const footer = modal.querySelector('.sheet-footer');
     if (!body || !footer) return;
 
-    const risk = FraudEngine.evaluateUpiRisk(targetUpi);
-    const badgeClass = this.getRiskBadgeClass(risk.level);
+    const hasTarget = !!targetUpi;
+    const risk = hasTarget ? FraudEngine.evaluateUpiRisk(targetUpi) : null;
+    const badgeClass = risk ? this.getRiskBadgeClass(risk.level) : '';
 
     body.innerHTML = `
-      <div style="text-align: center; padding: 6px 0;">
-        <div style="display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 50%; background: ${this.getRiskBgColor(risk.level)}; font-size: 1.75rem; margin-bottom: 8px;">
-          ${risk.level === RISK_LEVELS.HIGH ? '🚨' : risk.level === RISK_LEVELS.CAUTION ? '⚠️' : '✅'}
+      <!-- Search & Verify Bar -->
+      <div class="card" style="padding: 10px 12px; margin-bottom: 12px; background: var(--bg-subtle);">
+        <label style="display: block; font-size: var(--text-xs); font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">
+          VERIFY RECIPIENT REPUTATION
+        </label>
+        <div style="display: flex; gap: 6px;">
+          <input
+            type="text"
+            class="input-text mono"
+            id="input-risk-lookup-upi"
+            placeholder="Search UPI ID (e.g. powerbill.helpdesk@ybl)..."
+            value="${targetUpi}"
+            style="font-size: var(--text-xs); flex: 1;"
+          />
+          <button class="btn btn-primary btn-sm" id="btn-risk-lookup-search" style="width: auto; padding: 6px 14px; font-size: var(--text-xs);">
+            Check
+          </button>
         </div>
-        <h3 class="h3" style="color: var(--text-primary);">${displayName || targetUpi}</h3>
-        <div class="mono" style="font-size: var(--text-xs); color: var(--text-muted);">${targetUpi}</div>
-        <div style="margin-top: 6px;">
-          <span class="badge ${badgeClass}" style="font-size: 0.8rem; padding: 4px 12px;">${risk.level} RISK</span>
-          ${risk.underReview ? '<span class="badge badge-warning" style="margin-left: 6px;">⚖️ Under Review</span>' : ''}
-        </div>
-      </div>
-
-      <!-- Under Review Notice if Appeal exists -->
-      ${
-        risk.underReview
-          ? `
-        <div class="card" style="padding: 12px; border-left: 4px solid var(--warning); background: var(--warning-light); margin: 8px 0;">
-          <div style="font-size: var(--text-xs); font-weight: 700; color: var(--warning);">⚖️ Appeal Under Review</div>
-          <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px;">
-            The account owner submitted an appeal on ${new Date(risk.appeal.createdAt).toLocaleDateString()}. Community reports remain visible while verified moderators review KYC documents.
-          </div>
-        </div>
-      `
-          : ''
-      }
-
-      <!-- Risk Metric Breakdown Card -->
-      <div class="card" style="padding: 14px; margin-top: 10px;">
-        <div style="font-size: var(--text-xs); font-weight: 700; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 10px;">
-          COMMUNITY SPAM METRICS
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-          <div style="background: var(--bg-subtle); padding: 10px; border-radius: var(--radius-sm); text-align: center;">
-            <div style="font-size: var(--text-xs); color: var(--text-muted);">Spam Score</div>
-            <div style="font-size: 1.4rem; font-weight: 800; color: ${this.getRiskColor(risk.level)};">${Math.round(risk.score * 100)}%</div>
-            <div style="font-size: 0.65rem; color: var(--text-muted);">unique reports / interactions</div>
-          </div>
-          <div style="background: var(--bg-subtle); padding: 10px; border-radius: var(--radius-sm); text-align: center;">
-            <div style="font-size: var(--text-xs); color: var(--text-muted);">Unique Reporters</div>
-            <div style="font-size: 1.4rem; font-weight: 800; color: var(--text-primary);">${risk.uniqueReporters}</div>
-            <div style="font-size: 0.65rem; color: var(--text-muted);">${risk.meetsThreshold ? 'Threshold met (≥5)' : 'Below threshold (<5)'}</div>
-          </div>
-        </div>
-
-        <div style="font-size: var(--text-xs); color: var(--text-secondary); line-height: 1.5;">
-          <strong>Summary:</strong> ${risk.reasonSummary}
+        <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
+          <span style="font-size: 0.68rem; color: var(--text-muted); align-self: center;">Examples:</span>
+          <button type="button" class="btn btn-ghost btn-sm chip-risk-sample" data-sample-upi="powerbill.helpdesk@ybl" style="font-size: 0.68rem; padding: 2px 8px; height: auto;">
+            ⚡ Utility Desk (High Risk)
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm chip-risk-sample" data-sample-upi="reward.claim981@okaxis" style="font-size: 0.68rem; padding: 2px 8px; height: auto;">
+            🎁 Lottery Scam (High Risk)
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm chip-risk-sample" data-sample-upi="starbucks.order@icici" style="font-size: 0.68rem; padding: 2px 8px; height: auto;">
+            ☕ Starbucks (Verified Safe)
+          </button>
         </div>
       </div>
 
-      <!-- Extra Signals Box -->
-      ${
-        risk.extraSignals.length > 0
-          ? `
+      ${hasTarget ? `
+        <div style="text-align: center; padding: 6px 0;">
+          <div style="display: inline-flex; align-items: center; justify-content: center; width: 56px; height: 56px; border-radius: 50%; background: ${this.getRiskBgColor(risk.level)}; font-size: 1.75rem; margin-bottom: 8px;">
+            ${risk.level === RISK_LEVELS.HIGH ? '🚨' : risk.level === RISK_LEVELS.CAUTION ? '⚠️' : '✅'}
+          </div>
+          <h3 class="h3" style="color: var(--text-primary);">${displayName || targetUpi}</h3>
+          <div class="mono" style="font-size: var(--text-xs); color: var(--text-muted);">${targetUpi}</div>
+          <div style="margin-top: 6px;">
+            <span class="badge ${badgeClass}" style="font-size: 0.8rem; padding: 4px 12px;">${risk.level} RISK</span>
+            ${risk.underReview ? '<span class="badge badge-warning" style="margin-left: 6px;">⚖️ Under Review</span>' : ''}
+          </div>
+        </div>
+
+        <!-- Under Review Notice if Appeal exists -->
+        ${
+          risk.underReview
+            ? `
+          <div class="card" style="padding: 12px; border-left: 4px solid var(--warning); background: var(--warning-light); margin: 8px 0;">
+            <div style="font-size: var(--text-xs); font-weight: 700; color: var(--warning);">⚖️ Appeal Under Review</div>
+            <div style="font-size: 0.72rem; color: var(--text-secondary); margin-top: 2px;">
+              The account owner submitted an appeal on ${new Date(risk.appeal.createdAt).toLocaleDateString()}. Community reports remain visible while verified moderators review KYC documents.
+            </div>
+          </div>
+        `
+            : ''
+        }
+
+        <!-- Risk Metric Breakdown Card -->
         <div class="card" style="padding: 14px; margin-top: 10px;">
-          <div style="font-size: var(--text-xs); font-weight: 700; color: var(--danger); margin-bottom: 8px;">
-            ⚠️ EXTRA RISK SIGNALS DETECTED
+          <div style="font-size: var(--text-xs); font-weight: 700; color: var(--text-muted); letter-spacing: 0.05em; margin-bottom: 10px;">
+            COMMUNITY SPAM METRICS
           </div>
-          <div style="display: flex; flex-direction: column; gap: 6px;">
-            ${risk.extraSignals
-              .map(
-                (sig) => `
-              <div style="display: flex; align-items: center; gap: 8px; font-size: var(--text-xs); color: var(--text-primary);">
-                <span>${sig.severity === 'high' ? '🚩' : '⚡'}</span>
-                <span>${sig.label}</span>
-              </div>
-            `
-              )
-              .join('')}
-          </div>
-        </div>
-      `
-          : ''
-      }
 
-      <!-- Appeal Form Section (if flagged user or testing appeal) -->
-      ${
-        !risk.underReview && risk.level !== RISK_LEVELS.LOW
-          ? `
-        <div class="card" style="padding: 14px; margin-top: 10px; background: var(--bg-subtle);">
-          <div style="font-size: var(--text-xs); font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
-            Is this your account or a mistake?
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+            <div style="background: var(--bg-subtle); padding: 10px; border-radius: var(--radius-sm); text-align: center;">
+              <div style="font-size: var(--text-xs); color: var(--text-muted);">Spam Score</div>
+              <div style="font-size: 1.4rem; font-weight: 800; color: ${this.getRiskColor(risk.level)};">${Math.round(risk.score * 100)}%</div>
+              <div style="font-size: 0.65rem; color: var(--text-muted);">unique reports / interactions</div>
+            </div>
+            <div style="background: var(--bg-subtle); padding: 10px; border-radius: var(--radius-sm); text-align: center;">
+              <div style="font-size: var(--text-xs); color: var(--text-muted);">Unique Reporters</div>
+              <div style="font-size: 1.4rem; font-weight: 800; color: var(--text-primary);">${risk.uniqueReporters}</div>
+              <div style="font-size: 0.65rem; color: var(--text-muted);">${risk.meetsThreshold ? 'Threshold met (≥5)' : 'Below threshold (<5)'}</div>
+            </div>
           </div>
-          <p style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 8px;">
-            Submit an appeal with legitimate context. Your flag will be marked "Under Review" pending investigation.
-          </p>
-          <div style="display: flex; gap: 6px;">
-            <input type="text" class="input-text" id="appeal-reason-input" placeholder="e.g. I am a registered student club treasurer..." style="font-size: var(--text-xs);" />
-            <button class="btn btn-sm btn-secondary" id="btn-submit-appeal" style="width: auto; padding: 6px 14px;">
-              Appeal
-            </button>
+
+          <div style="font-size: var(--text-xs); color: var(--text-secondary); line-height: 1.5;">
+            <strong>Summary:</strong> ${risk.reasonSummary}
           </div>
         </div>
-      `
-          : ''
-      }
+
+        <!-- Extra Signals Box -->
+        ${
+          risk.extraSignals.length > 0
+            ? `
+          <div class="card" style="padding: 14px; margin-top: 10px;">
+            <div style="font-size: var(--text-xs); font-weight: 700; color: var(--danger); margin-bottom: 8px;">
+              ⚠️ EXTRA RISK SIGNALS DETECTED
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              ${risk.extraSignals
+                .map(
+                  (sig) => `
+                <div style="display: flex; align-items: center; gap: 8px; font-size: var(--text-xs); color: var(--text-primary);">
+                  <span>${sig.severity === 'high' ? '🚩' : '⚡'}</span>
+                  <span>${sig.label}</span>
+                </div>
+              `
+                )
+                .join('')}
+            </div>
+          </div>
+        `
+            : ''
+        }
+
+        <!-- Appeal Form Section (if flagged user or testing appeal) -->
+        ${
+          !risk.underReview && risk.level !== RISK_LEVELS.LOW
+            ? `
+          <div class="card" style="padding: 14px; margin-top: 10px; background: var(--bg-subtle);">
+            <div style="font-size: var(--text-xs); font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">
+              Is this your account or a mistake?
+            </div>
+            <p style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 8px;">
+              Submit an appeal with legitimate context. Your flag will be marked "Under Review" pending investigation.
+            </p>
+            <div style="display: flex; gap: 6px;">
+              <input type="text" class="input-text" id="appeal-reason-input" placeholder="e.g. Registered merchant, legitimate business..." style="font-size: var(--text-xs);" />
+              <button class="btn btn-sm btn-secondary" id="btn-submit-appeal" style="width: auto; padding: 6px 14px;">
+                Appeal
+              </button>
+            </div>
+          </div>
+        `
+            : ''
+        }
+      ` : `
+        <!-- Overview When No Target Selected -->
+        <div class="card" style="padding: 18px; text-align: center; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); margin-top: 8px;">
+          <div style="font-size: 2.25rem; margin-bottom: 8px;">🛡️</div>
+          <h4 style="font-size: var(--text-sm); font-weight: 700; color: var(--text-primary); margin-bottom: 4px;">PocketPe Protection Shield</h4>
+          <p style="font-size: var(--text-xs); color: var(--text-secondary); line-height: 1.4; margin-bottom: 14px;">
+            A community-driven safety network for UPI payments. Check recipient reputation, detect fake collect requests, and protect your funds from frauds.
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 8px; text-align: left; font-size: var(--text-xs); color: var(--text-muted); margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span>✅</span> <span>Ratio-weighted scoring protects legitimate merchants.</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span>⏳</span> <span>30-day time decay prevents permanent false penalties.</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span>🚨</span> <span>Automatic 3-second safety cooldown for high-risk payments.</span>
+            </div>
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btn-overview-file-report" style="width: 100%;">
+            🚨 Report a Suspicious UPI ID
+          </button>
+        </div>
+      `}
     `;
 
     footer.innerHTML = `
       <div style="display: flex; gap: 10px; width: 100%;">
-        <button class="btn btn-secondary" id="btn-open-report-from-detail" style="flex: 1;">
-          🚩 Report Target
-        </button>
+        ${hasTarget ? `
+          <button class="btn btn-secondary" id="btn-open-report-from-detail" style="flex: 1;">
+            🚩 Report Target
+          </button>
+        ` : ''}
         <button class="btn btn-primary" data-close-modal="modal-upi-risk-detail" style="flex: 1;">
           Done
         </button>
       </div>
     `;
+
+    // Lookup input search button
+    const lookupBtn = body.querySelector('#btn-risk-lookup-search');
+    const lookupInput = body.querySelector('#input-risk-lookup-upi');
+    if (lookupBtn && lookupInput) {
+      const doLookup = () => {
+        const val = lookupInput.value.trim();
+        if (!val) {
+          NavigationManager.showToast('Please enter a UPI ID to verify.', 'info');
+          return;
+        }
+        this.openRiskDetailModal(val);
+      };
+      lookupBtn.addEventListener('click', doLookup);
+      lookupInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') doLookup();
+      });
+    }
+
+    // Sample chips
+    body.querySelectorAll('.chip-risk-sample').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const sample = btn.getAttribute('data-sample-upi');
+        this.openRiskDetailModal(sample);
+      });
+    });
+
+    // Overview file report button
+    const overviewReportBtn = body.querySelector('#btn-overview-file-report');
+    if (overviewReportBtn) {
+      overviewReportBtn.addEventListener('click', () => {
+        NavigationManager.closeModal('modal-upi-risk-detail');
+        this.openReportModal('');
+      });
+    }
 
     // Appeal button click
     const appealBtn = body.querySelector('#btn-submit-appeal');

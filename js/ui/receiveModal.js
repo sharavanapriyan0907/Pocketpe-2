@@ -70,7 +70,7 @@ export class ReceiveModal {
     const rawBank = user.simulatedBank || 'HDFC Bank';
     const cleanBank = rawBank
       .replace('Simulated Account', 'Bank')
-      .replace('Simulated Demo Bank', 'HDFC Bank')
+      .replace('Simulated Bank', 'HDFC Bank')
       .replace('Simulated', '')
       .trim() || 'HDFC Bank';
 
@@ -132,7 +132,6 @@ export class ReceiveModal {
       <div style="text-align: center; margin-bottom: 12px;">
         <h3 class="h3" style="color: var(--text-primary); margin-bottom: 2px;">Deposit & Auto-Split</h3>
         <p class="subtitle">Incoming funds automatically allocate into your purpose wallets.</p>
-        ${isDev ? `<span class="dev-mode-pill" style="margin-top: 4px; display: inline-block;">🛠️ Dev Mode: Instant Deposit Simulation</span>` : ''}
       </div>
 
       <div class="card" style="text-align: center; padding: 20px;">
@@ -152,11 +151,10 @@ export class ReceiveModal {
       <div class="form-group" style="margin-top: 14px;">
         <label class="form-label">Deposit Source</label>
         <select class="input-text" id="receive-source-select">
-          <option value="Monthly Salary / Allowance" ${this.source.includes('Salary') ? 'selected' : ''}>Monthly Salary / Allowance</option>
-          <option value="Freelance / Client Payment" ${this.source.includes('Freelance') ? 'selected' : ''}>Freelance / Client Payment</option>
-          <option value="Direct Bank Transfer" ${this.source.includes('Bank') ? 'selected' : ''}>Direct Bank Transfer</option>
-          <option value="Gift from Family / Friends" ${this.source.includes('Gift') ? 'selected' : ''}>Gift from Family / Friends</option>
-          <option value="Refund / Cashback" ${this.source.includes('Refund') ? 'selected' : ''}>Refund / Cashback</option>
+          <option value="Inward UPI Transfer" ${this.source.includes('UPI') ? 'selected' : ''}>Inward UPI Transfer</option>
+          <option value="Bank Transfer (NEFT / IMPS)" ${this.source.includes('Bank') ? 'selected' : ''}>Bank Transfer (NEFT / IMPS)</option>
+          <option value="Savings Allocation" ${this.source.includes('Savings') ? 'selected' : ''}>Savings Allocation</option>
+          <option value="General Inflow" ${this.source.includes('Inflow') ? 'selected' : ''}>General Inflow</option>
         </select>
         <span class="caption">Funds will be divided based on your active Purpose Allocation rules.</span>
       </div>

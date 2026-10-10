@@ -22,22 +22,33 @@ class StateManager {
       const stored = localStorage.getItem(APP_CONFIG.STORAGE_KEYS.APP_STATE);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed.wallets && parsed.transactions) {
+        if (parsed.wallets) {
           // Ensure new feature namespaces exist on legacy state
           if (!parsed.fraudDetection) {
             parsed.fraudDetection = JSON.parse(JSON.stringify(INITIAL_FRAUD_DATA));
           }
           if (!parsed.collectRequests) {
-            parsed.collectRequests = JSON.parse(JSON.stringify(INITIAL_COLLECT_REQUESTS));
+            parsed.collectRequests = [];
           }
           if (!parsed.splitBill) {
             parsed.splitBill = JSON.parse(JSON.stringify(INITIAL_SPLIT_DATA));
+          }
+          if (!parsed.commitments || !Array.isArray(parsed.commitments)) {
+            parsed.commitments = [];
+          }
+          // Filter out legacy predetermined transactions
+          if (Array.isArray(parsed.transactions)) {
+            parsed.transactions = parsed.transactions.filter(
+              (t) => !['tx_101', 'tx_102', 'tx_103', 'tx_104', 'tx_105'].includes(t.id)
+            );
+          } else {
+            parsed.transactions = [];
           }
           return parsed;
         }
       }
     } catch (e) {
-      console.warn('Failed to load state from localStorage, using initial mock data', e);
+      console.warn('Failed to load state from localStorage, initializing fresh state', e);
     }
 
     return {
@@ -47,17 +58,18 @@ class StateManager {
         email: null,
         isAuthenticated: false,
         greeting: 'Good morning',
-        simulatedBank: 'HDFC Simulated Account',
-        accountNumber: '••• 4892',
+        bankName: 'HDFC Bank',
+        accountNumber: '••• 4821',
         supabaseUser: null,
       },
       wallets: JSON.parse(JSON.stringify(INITIAL_WALLETS)),
-      transactions: JSON.parse(JSON.stringify(INITIAL_TRANSACTIONS)),
+      transactions: [],
+      commitments: [],
       learnedMerchants: {},
       isBalanceHidden: false,
       activeTab: 'home',
       fraudDetection: JSON.parse(JSON.stringify(INITIAL_FRAUD_DATA)),
-      collectRequests: JSON.parse(JSON.stringify(INITIAL_COLLECT_REQUESTS)),
+      collectRequests: [],
       splitBill: JSON.parse(JSON.stringify(INITIAL_SPLIT_DATA)),
     };
   }
@@ -138,12 +150,12 @@ class StateManager {
       provider: null,
       isAuthenticated: false,
       greeting: 'Welcome',
-      simulatedBank: 'Simulated Demo Bank',
-      accountNumber: '••• 0000',
+      bankName: 'HDFC Bank',
+      accountNumber: '••• 4821',
       supabaseUser: null,
     };
 
-    // Revert to demo/guest state
+    // Revert to clean guest state
     this.loadUserScopedData('usr_guest');
 
     console.log('👤 Cleared authenticated user, reverted to guest');
@@ -168,15 +180,20 @@ class StateManager {
         if (Array.isArray(parsed.transactions)) {
           this.state.transactions = parsed.transactions;
         }
+        if (Array.isArray(parsed.commitments)) {
+          this.state.commitments = parsed.commitments;
+        }
         return true;
       }
     } catch (e) {
       console.warn('Could not load user-scoped data:', e);
     }
 
-    // Initialize fresh default wallets for new authenticated user
+    // Initialize fresh zero-state wallets for new authenticated user
     if (userId !== 'usr_001' && userId !== 'usr_guest') {
       this.state.wallets = JSON.parse(JSON.stringify(INITIAL_WALLETS));
+      this.state.transactions = [];
+      this.state.commitments = [];
       this.state.learnedMerchants = {};
       this.saveUserScopedData(userId);
     }
@@ -191,6 +208,7 @@ class StateManager {
         wallets: this.state.wallets,
         learnedMerchants: this.state.learnedMerchants,
         transactions: this.state.transactions,
+        commitments: this.state.commitments || [],
         updatedAt: new Date().toISOString(),
       };
       localStorage.setItem(storageKey, JSON.stringify(userData));
@@ -597,28 +615,166 @@ class StateManager {
     return newSettlement;
   }
 
-  // --- Reset All Data ---
-  resetToDemoData() {
+  // --- Financial Commitments & Schedules ---
+  getCommitments() {
+    return this.state.commitments || [];
+  }
+
+  getCommitment(commitmentId) {
+    return (this.state.commitments || []).find((c) => c.id === commitmentId) || null;
+  }
+
+  addCommitment(data) {
+    const newCommitment = {
+      id: `pmt_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+      name: (data.name || '').trim(),
+      payee: (data.payee || '').trim(),
+      amount: Number(data.amount) || 0,
+      dueDate: data.dueDate || new Date().toISOString().split('T')[0],
+      frequency: data.frequency || 'monthly',
+      walletId: data.walletId || data.preferredWalletId || (this.state.wallets[0]?.id || 'wallet_housing'),
+      preferredWalletId: data.walletId || data.preferredWalletId || (this.state.wallets[0]?.id || 'wallet_housing'),
+      notes: (data.notes || '').trim(),
+      category: data.category || 'Other',
+      status: data.status || 'PLANNED',
+      createdAt: new Date().toISOString(),
+      lastPaidAt: null,
+      lastTxId: null,
+      isMandateAuthorized: !!data.isMandateAuthorized,
+    };
+
+    if (!this.state.commitments) {
+      this.state.commitments = [];
+    }
+    this.state.commitments.unshift(newCommitment);
+    this.notify('commitment:added', newCommitment);
+    this.notify('state:changed');
+    return newCommitment;
+  }
+
+  updateCommitment(commitmentId, updates) {
+    const commitment = this.getCommitment(commitmentId);
+    if (!commitment) return null;
+    Object.assign(commitment, updates);
+    this.notify('commitment:updated', commitment);
+    this.notify('state:changed');
+    return commitment;
+  }
+
+  deleteCommitment(commitmentId) {
+    if (!this.state.commitments) return false;
+    const idx = this.state.commitments.findIndex((c) => c.id === commitmentId);
+    if (idx === -1) return false;
+    const removed = this.state.commitments.splice(idx, 1)[0];
+    this.notify('commitment:deleted', removed);
+    this.notify('state:changed');
+    return true;
+  }
+
+  executeCommitmentPayment(commitmentId, paymentDetails = {}) {
+    const commitment = this.getCommitment(commitmentId);
+    if (!commitment) return null;
+
+    const wallet = this.getWallet(commitment.walletId);
+    const amount = Number(commitment.amount);
+
+    // Deduct from wallet if available
+    if (wallet) {
+      wallet.balance = Math.max(0, (Number(wallet.balance) || 0) - amount);
+    }
+
+    // Record verified transaction
+    const tx = this.addTransaction({
+      merchantName: commitment.payee || commitment.name,
+      amount: amount,
+      type: 'debit',
+      category: commitment.category || 'General',
+      walletId: commitment.walletId,
+      note: paymentDetails.note || `Payment for ${commitment.name}`,
+    });
+
+    commitment.lastPaidAt = new Date().toISOString();
+    commitment.lastTxId = tx.id;
+
+    if (commitment.frequency === 'one-time') {
+      commitment.status = 'SUCCESS';
+    } else {
+      // Calculate next recurring cycle
+      const nextDate = new Date(commitment.dueDate);
+      if (commitment.frequency === 'weekly') {
+        nextDate.setDate(nextDate.getDate() + 7);
+      } else if (commitment.frequency === 'quarterly') {
+        nextDate.setMonth(nextDate.getMonth() + 3);
+      } else if (commitment.frequency === 'yearly') {
+        nextDate.setFullYear(nextDate.getFullYear() + 1);
+      } else {
+        // default monthly
+        nextDate.setMonth(nextDate.getMonth() + 1);
+      }
+      commitment.dueDate = nextDate.toISOString().split('T')[0];
+      commitment.status = 'PLANNED';
+    }
+
+    this.notify('commitment:paid', { commitment, tx });
+    this.notify('state:changed');
+    return { commitment, tx };
+  }
+
+  // --- Real Funding Flow (Add Money to Wallet) ---
+  depositMoney(walletId, amount, method = 'HDFC Bank •• 4821', note = '') {
+    const wallet = this.getWallet(walletId);
+    if (!wallet) return null;
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) return null;
+
+    wallet.balance = (Number(wallet.balance) || 0) + numAmount;
+
+    const tx = this.addTransaction({
+      merchantName: method || 'Bank Deposit (HDFC Bank •• 4821)',
+      amount: numAmount,
+      type: 'credit',
+      category: 'Deposit',
+      walletId: wallet.id,
+      note: note || `Funded ${wallet.name} wallet via ${method}`,
+    });
+
+    this.notify('wallet:funded', { wallet, amount: numAmount, tx });
+    this.notify('state:changed');
+    return { wallet, tx };
+  }
+
+  // --- Reset All Data to Clean Production Zero State ---
+  resetToCleanState() {
     this.state.user = {
       id: 'usr_001',
       name: 'Sharath Kumar',
       email: null,
       isAuthenticated: false,
       greeting: 'Good morning',
-      simulatedBank: 'HDFC Simulated Account',
-      accountNumber: '••• 4892',
+      bankName: 'HDFC Bank',
+      accountNumber: '••• 4821',
       supabaseUser: null,
     };
     this.state.wallets = JSON.parse(JSON.stringify(INITIAL_WALLETS));
-    this.state.transactions = JSON.parse(JSON.stringify(INITIAL_TRANSACTIONS));
+    this.state.transactions = [];
+    this.state.commitments = [];
     this.state.learnedMerchants = {};
     this.state.isBalanceHidden = false;
     this.state.fraudDetection = JSON.parse(JSON.stringify(INITIAL_FRAUD_DATA));
-    this.state.collectRequests = JSON.parse(JSON.stringify(INITIAL_COLLECT_REQUESTS));
+    this.state.collectRequests = [];
     this.state.splitBill = JSON.parse(JSON.stringify(INITIAL_SPLIT_DATA));
     this.saveState();
     this.notify('auth:changed', this.state.user);
     this.notify('state:reset', this.state);
+  }
+
+  resetData() {
+    this.resetToCleanState();
+  }
+
+  // Backward compatibility alias for test suites
+  resetToDemoData() {
+    this.resetToCleanState();
   }
 }
 

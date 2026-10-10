@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>PocketPe — Every Rupee Has a Purpose</title>
-  <meta name="description" content="Intent-based personal money management prototype. Convert mental money separation into visual purpose-based virtual wallets." />
+  <meta name="description" content="Intent-based personal money management. Convert mental money separation into visual purpose-based virtual wallets and intelligent payment planning." />
   <meta name="theme-color" content="#090d16" />
 
   <!-- Google Font: Inter -->
@@ -26,10 +26,7 @@
       <div class="brand-section">
         <div class="brand-logo-mark">₹</div>
         <div class="brand-info">
-          <h1>
-            PocketPe
-            <span class="dev-mode-pill" id="badge-dev-mode" style="display: none;">🛠️ DEV MODE</span>
-          </h1>
+          <h1>PocketPe</h1>
           <p>«Every rupee has a purpose» • Intelligent Purpose-Led UPI Payments</p>
         </div>
       </div>
@@ -76,20 +73,8 @@
           <span class="accent-dot" data-color="teal" title="Cyan Teal"></span>
         </div>
 
-        <button class="desktop-btn dev-control-only" id="btn-desktop-tour" title="Take App Tour">
-          <span>✨</span> <span>Tour</span>
-        </button>
-
-        <button class="desktop-btn dev-control-only" id="btn-desktop-tests" title="Run Unit Tests for Fraud Detection, Split Calculation & Supabase Auth">
-          <span>🧪</span> <span>Run Tests</span>
-        </button>
-
-        <button class="desktop-btn" id="btn-desktop-auth" title="PocketPe Supabase Account">
+        <button class="desktop-btn" id="btn-desktop-auth" title="PocketPe Account">
           <span>🔐</span> <span id="label-desktop-auth">Sign In</span>
-        </button>
-
-        <button class="desktop-btn dev-control-only" id="btn-desktop-reset" title="Reset to Initial Demo State">
-          <span>🔄</span> <span>Reset Data</span>
         </button>
       </div>
     </header>
@@ -360,18 +345,7 @@
             </div>
           </div>
 
-          <!-- Automated Unit Tests Results Modal -->
-          <div class="modal-overlay" id="modal-unit-tests" aria-hidden="true">
-            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Unit Tests Results">
-              <div class="sheet-grabber"></div>
-              <div class="sheet-header">
-                <h3 class="sheet-title">Automated Unit Tests</h3>
-                <button class="sheet-close-btn" data-close-modal="modal-unit-tests" aria-label="Close">✕</button>
-              </div>
-              <div class="sheet-body"></div>
-              <div class="sheet-footer"></div>
-            </div>
-          </div>
+
 
           <!-- Supabase Authentication Modal (Login / Sign Up) -->
           <div class="modal-overlay" id="modal-auth" aria-hidden="true">
@@ -385,18 +359,7 @@
             </div>
           </div>
 
-          <!-- Supabase Configuration Modal -->
-          <div class="modal-overlay" id="modal-supabase-config" aria-hidden="true">
-            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Supabase Settings">
-              <div class="sheet-grabber"></div>
-              <div class="sheet-header">
-                <h3 class="sheet-title">Supabase Settings</h3>
-                <button class="sheet-close-btn" data-close-modal="modal-supabase-config" aria-label="Close">✕</button>
-              </div>
-              <div class="sheet-body"></div>
-              <div class="sheet-footer"></div>
-            </div>
-          </div>
+
 
           <!-- Edit Profile Modal -->
           <div class="modal-overlay" id="modal-edit-profile" aria-hidden="true">
@@ -405,6 +368,71 @@
               <div class="sheet-header">
                 <h3 class="sheet-title">Edit Profile</h3>
                 <button class="sheet-close-btn" data-close-modal="modal-edit-profile" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Add Payment Commitment Modal -->
+          <div class="modal-overlay" id="modal-add-commitment" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Add Payment Commitment">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Add Payment</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-add-commitment" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- View Payment Commitment Modal -->
+          <div class="modal-overlay" id="modal-view-commitment" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Payment Details">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Payment Overview</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-view-commitment" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Change Commitment Wallet Modal -->
+          <div class="modal-overlay" id="modal-change-wallet" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Change Purpose Wallet">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Change Preferred Wallet</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-change-wallet" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Add Money / Funding Action Modal -->
+          <div class="modal-overlay" id="modal-funding-action" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="Add Money to Wallet">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Add Money</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-funding-action" aria-label="Close">✕</button>
+              </div>
+              <div class="sheet-body"></div>
+              <div class="sheet-footer"></div>
+            </div>
+          </div>
+
+          <!-- Onboarding Tour Modal -->
+          <div class="modal-overlay" id="modal-onboarding" aria-hidden="true">
+            <div class="bottom-sheet" role="dialog" aria-modal="true" aria-label="PocketPe Tour">
+              <div class="sheet-grabber"></div>
+              <div class="sheet-header">
+                <h3 class="sheet-title">Welcome to PocketPe</h3>
+                <button class="sheet-close-btn" data-close-modal="modal-onboarding" aria-label="Close">✕</button>
               </div>
               <div class="sheet-body"></div>
               <div class="sheet-footer"></div>

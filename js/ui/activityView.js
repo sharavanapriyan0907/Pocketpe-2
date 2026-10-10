@@ -3,7 +3,7 @@
    ========================================================================== */
 
 import { stateManager } from '../state.js';
-import { DEMO_MERCHANTS } from '../config.js';
+import { KNOWN_MERCHANT_DIRECTORY } from '../config.js';
 import { WalletEngine } from '../engines/walletEngine.js';
 import { CategoryEngine } from '../engines/categoryEngine.js';
 import { FraudEngine } from '../engines/fraudEngine.js';
@@ -217,7 +217,7 @@ export class ActivityView {
     // Resolve UPI ID for merchant
     let upiId = tx.upiId;
     if (!upiId) {
-      const match = DEMO_MERCHANTS.find((m) => m.name.toLowerCase() === tx.merchantName.toLowerCase());
+      const match = KNOWN_MERCHANT_DIRECTORY.find((m) => m.name.toLowerCase() === tx.merchantName.toLowerCase());
       upiId = match ? match.upiId : (tx.merchantName.includes('@') ? tx.merchantName : tx.merchantName.toLowerCase().replace(/[^a-z0-9]/g, '') + '@upi');
     }
     const risk = FraudEngine.evaluateUpiRisk(upiId);
